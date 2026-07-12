@@ -69,7 +69,12 @@ const productSchema = new mongoose.Schema({
         type: Number,
         default: 0,
         index: true
-    }
+    },
+
+    variants: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product"
+    }]
 }, {timestamps: true})
 
 productSchema.index({ name: 'text', description: 'text', searchTags: 'text' });
