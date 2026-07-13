@@ -19,11 +19,9 @@ const categorySchema = new mongoose.Schema({
         required: true
     },
 
-    parentId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Category',
-        index: true,
-        default: null
+    productCount: {
+        type: Number,
+        default: 0
     },
 
     totalSalesCount: {

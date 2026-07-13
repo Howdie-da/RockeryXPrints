@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const productSchema = new mongoose.Schema({
     name: {
@@ -6,6 +7,13 @@ const productSchema = new mongoose.Schema({
         required: true,
         unique: true,
         trim: true
+    },
+    slug: {
+        type: String,
+        required: true,
+        trim: true,
+        unique: true,
+        lowercase: true
     },
     description: {
         type: String,
@@ -27,6 +35,11 @@ const productSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Category',
         required: true
+    },
+    parentProduct: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+        default: null
     },
     searchTags: [{
         type: String,
@@ -78,5 +91,7 @@ const productSchema = new mongoose.Schema({
 }, {timestamps: true})
 
 productSchema.index({ name: 'text', description: 'text', searchTags: 'text' });
+
+productSchema.plugin(mongooseAggregatePaginate);
 
 export const Product = mongoose.model("Product", productSchema)
