@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 const options = {
@@ -189,10 +189,85 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     }
 })
 
+const getCurrentUser = asyncHandler(async (req, res) => {
+    return res
+    .status(200)
+    .json(new ApiResponse(200, req.user))
+})
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
+    let {email, fullName} = req.body
+
+    if (!email && !fullName) {
+        throw new ApiError(400, "Enter a valid credential")
+    }
+
+    if (!email) {
+        email = req.user?.email
+    }
+
+    if (!fullName) {
+        fullName = req.user?.fullName
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set: {
+                email,
+                fullName
+            }
+        },
+        {
+            returnDocument: 'after'
+        }
+    ).select("-password -refreshToken")
+
+    if (!user) {
+        throw new ApiError(500, "Interal Error Occurred.")
+    }
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Account Details Updated."))
+})
+
+const updateAvatar = asyncHandler(async (req, res) => {
+    const avatarLocalPath = req.files?.avatar?.[0]?.path
+
+    if (!avatarLocalPath) {
+        throw new ApiError(400, "Upload avatar file.")
+    }
+
+    const avatar = await uploadOnCloudinary(avatarLocalPath)
+
+    if (!avatar) {
+        throw new ApiError(500, "Error uploading avatar.")
+    }
+
+    await deleteOnCloudinary(req.user?.avatar)
+
+    await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set: {
+                avatar: avatar.url
+            }
+        }
+    )
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, "Avatar file uploaded successfully."))
+})
+
 export {
     registerUser,
     loginUser,
     logoutUser,
     changePassword,
-    refreshAccessToken
+    refreshAccessToken,
+    getCurrentUser,
+    updateAccountDetails,
+    updateAvatar
 }
