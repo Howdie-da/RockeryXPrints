@@ -4,6 +4,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { deleteOnCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { Product } from "../models/product.model.js";
 
 const options = {
     httpOnly: true,
@@ -261,6 +262,73 @@ const updateAvatar = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, "Avatar file uploaded successfully."))
 })
 
+const getUserCart = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user?._id).populate(
+        "cart.product", 
+        "name sellingPrice mrp images slug stock"
+    )
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user.cart, "Cart fetched successfully"));
+})
+
+const addToCart = asyncHandler(async (req, res) => {
+    const {productId, quantity = 1} = req.body
+
+    const product = await Product.findById(productId);
+
+    if (!product) {
+        throw new ApiError(404, "Product not found");
+    }
+
+    if (product.stock < quantity) {
+        throw new ApiError(400, "Not enough stock available");
+    }
+
+    const user = await User.findById(req.user._id);
+
+    const existingCartItemIndex = user.cart.findIndex((item) => item.product.toString() === productId.toString())
+
+    if (existingCartItemIndex > -1) {
+        user.cart[existingCartItemIndex].quantity += Number(quantity);
+        
+        if (user.cart[existingCartItemIndex].quantity > product.stock) {
+            user.cart[existingCartItemIndex].quantity = product.stock;
+        }
+    } else {
+        user.cart.push({ product: productId, quantity: Number(quantity) });
+    }
+
+    await user.save({ validateBeforeSave: false });
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user.cart, "Item added to cart"));
+})
+
+const removeFromCart = asyncHandler(async (req, res) => {
+    const { productId } = req.params;
+
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $pull: { cart: { product: productId } }
+        },
+        { 
+            returnDocument: 'after'
+        }
+    );
+
+    if (!user) {
+        throw new ApiError(404, "User not found");
+    }
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user.cart, "Item removed from cart"));
+})
+
 export {
     registerUser,
     loginUser,
@@ -269,5 +337,8 @@ export {
     refreshAccessToken,
     getCurrentUser,
     updateAccountDetails,
-    updateAvatar
+    updateAvatar,
+    getUserCart,
+    addToCart,
+    removeFromCart
 }

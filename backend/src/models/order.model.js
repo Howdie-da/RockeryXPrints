@@ -23,6 +23,10 @@ const orderSchema = new mongoose.Schema({
             type: String, 
             required: true
         },
+        image: {
+            type: String, 
+            required: true
+        },
         quantity: { 
             type: Number, 
             required: true,
@@ -59,8 +63,15 @@ const orderSchema = new mongoose.Schema({
         street: { type: String, required: true },
         city: { type: String, required: true },
         state: { type: String, required: true },
-        zipCode: { type: Number, required: true },
-        country: { type: String, required: true }
+        zipCode: { type: String, required: true },
+        country: { type: String, required: true },
+        phone: { type: String, required: true }
+    },
+    
+    paymentMethod: {
+        type: String,
+        required: true,
+        default: "Online"
     },
     paymentStatus: {
         type: String,
