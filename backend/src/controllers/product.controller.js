@@ -20,22 +20,22 @@ const addCategory = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Category with this name already exists.");
     }
     
-    const coverPhotoPath = req.files?.coverPhoto?.[0]?.path
+    const coverImagePath = req.files?.coverImage?.[0]?.path
 
-    if (!coverPhotoPath) {
+    if (!coverImagePath) {
         throw new ApiError(400, "Upload cover photo for category")
     }
 
-    const coverPhoto = await uploadOnCloudinary(coverPhotoPath)
+    const coverImage = await uploadOnCloudinary(coverImagePath)
 
-    if (!coverPhoto) {
+    if (!coverImage) {
         throw new ApiError(500, "Internal occurred while uploading cover photo")
     }
 
     const category = await Category.create({
         name,
         slug,
-        coverPhoto: coverPhoto.url
+        coverImage: coverImage.url
     })
 
     if (!category) {
@@ -58,13 +58,13 @@ const getCategories = asyncHandler(async (req, res) => {
 })
 
 const deleteCategory = asyncHandler(async (req, res) => {
-    const { slug } = req.params;
+    const { categoryId } = req.params;
 
-    if (!slug) {
+    if (!categoryId) {
         throw new ApiError(400, "Choose a category to delete")
     }
 
-    const existingCategory = await Category.findOne({ slug });
+    const existingCategory = await Category.findById(categoryId);
     
     if (!existingCategory) {
         throw new ApiError(404, "Category does not exist.");
@@ -74,8 +74,8 @@ const deleteCategory = asyncHandler(async (req, res) => {
         throw new ApiError(400, `Cannot delete. This category still contains ${existingCategory.productCount} products.`);
     }
 
-    if (existingCategory.coverPhoto) {
-        await deleteOnCloudinary(existingCategory.coverPhoto);
+    if (existingCategory.coverImage) {
+        await deleteOnCloudinary(existingCategory.coverImage);
     }
 
     await existingCategory.deleteOne()
@@ -87,7 +87,7 @@ const deleteCategory = asyncHandler(async (req, res) => {
 
 const addProduct = asyncHandler(async (req, res) => {
     const { name, description, mrp, sellingPrice, parentProduct, 
-        category, searchTags, sku, stock, deliveryDays} = req.body
+        category, searchTags, sku, stock, deliveryDays, features} = req.body
 
     if (!name || !description || !mrp || !sellingPrice || !category) {
         throw new ApiError(400, "Enter all required fields")
@@ -105,6 +105,15 @@ const addProduct = asyncHandler(async (req, res) => {
 
     if (existingProduct) {
         throw new ApiError(400, "Product with this name already exists")
+    }
+
+    let parsedFeatures = [];
+    if (features) {
+        try {
+            parsedFeatures = JSON.parse(features); 
+        } catch (error) {
+            throw new ApiError(400, "Invalid features format. Must be a valid JSON array.");
+        }
     }
 
     const imagesPath = req.files?.images?.map(item => item?.path) || []
@@ -129,13 +138,14 @@ const addProduct = asyncHandler(async (req, res) => {
         description,
         mrp: Number(mrp),
         sellingPrice: Number(sellingPrice),
-        category,
+        category: categoryExists._id,
         parentProduct: parentProduct || null,
         searchTags,
         sku,
         stock: Number(stock) || 0,
         deliveryDays: Number(deliveryDays),
-        images: imageUrls
+        images: imageUrls,
+        features: parsedFeatures
     })
 
     if (!product) {
@@ -143,7 +153,7 @@ const addProduct = asyncHandler(async (req, res) => {
     }
 
     if (!parentProduct) {
-        await Category.findByIdAndUpdate(category, {
+        await Category.findByIdAndUpdate(categoryExists._id, {
             $inc: { productCount: 1 }
         });
     }
@@ -156,8 +166,8 @@ const addProduct = asyncHandler(async (req, res) => {
 const updateProduct = asyncHandler(async (req, res) => {
     const { productId } = req.params;
     
-    const { name, description, mrp, sellingPrice, category, 
-        searchTags, sku, stock, deliveryDays, parentProduct } = req.body;
+    const { name, description, mrp, sellingPrice, category,
+        searchTags, sku, stock, deliveryDays, parentProduct, features } = req.body;
 
     const product = await Product.findById(productId);
     if (!product) {
@@ -165,8 +175,28 @@ const updateProduct = asyncHandler(async (req, res) => {
     }
 
     if (!product.parentProduct && product.category.toString() !== category.toString()) {
-        await Category.findByIdAndUpdate(product.category, { $inc: { productCount: -1 } });
-        await Category.findByIdAndUpdate(category, { $inc: { productCount: 1 } });
+        
+        const newCategoryExists = await Category.findById(category);
+        if (!newCategoryExists) {
+            throw new ApiError(400, "Wrong category chosen.");
+        }
+
+        await Category.findByIdAndUpdate(product.category, { 
+            $inc: { productCount: -1 } 
+        });
+        
+        await Category.findByIdAndUpdate(category, { 
+            $inc: { productCount: 1 } 
+        });
+    }
+
+    let parsedFeatures = [];
+    if (features) {
+        try {
+            parsedFeatures = JSON.parse(features); 
+        } catch (error) {
+            throw new ApiError(400, "Invalid features format. Must be a valid JSON array.");
+        }
     }
 
     let updatedImages = product.images; 
@@ -193,16 +223,19 @@ const updateProduct = asyncHandler(async (req, res) => {
                 description,
                 mrp: Number(mrp),
                 sellingPrice: Number(sellingPrice),
-                category,
+                category, 
                 parentProduct: parentProduct || null,
                 searchTags,
                 sku,
                 stock: Number(stock),
                 deliveryDays: Number(deliveryDays),
-                images: updatedImages 
+                images: updatedImages,
+                features: parsedFeatures
             }
         },
-        { new: true } 
+        { 
+            returnDocument: 'after'
+         } 
     );
 
     return res
@@ -351,5 +384,7 @@ export {
     deleteCategory,
     addProduct,
     updateProduct,
-    deleteProduct
+    deleteProduct,
+    getProducts,
+    getProductBySlug
 }
