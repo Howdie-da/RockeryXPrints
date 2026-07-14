@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { upload } from "../middleware/multer.middleware.js";
-import { changePassword, getCurrentUser, loginUser, logoutUser, refreshAccessToken, registerUser, updateAccountDetails, updateAvatar } from "../controllers/user.controller.js";
+import { addToCart, changePassword, getCurrentUser, getUserCart, loginUser, logoutUser, refreshAccessToken, registerUser, removeFromCart, updateAccountDetails, updateAvatar } from "../controllers/user.controller.js";
 import { jwtVerifier } from "../middleware/jwt.middleware.js";
 
 const userRouter = Router()
@@ -17,21 +17,30 @@ userRouter.route('/register').post(
 
 userRouter.route('/login').post(loginUser)
 
-userRouter.route('/logout').get(jwtVerifier, logoutUser)
+userRouter.use(jwtVerifier)
 
-userRouter.route('/change-password').post(jwtVerifier, changePassword)
+userRouter.route('/logout').get(logoutUser)
 
-userRouter.route('/refresh-token').post(jwtVerifier, refreshAccessToken)
+userRouter.route('/change-password').post(changePassword)
 
-userRouter.route('/current-user').get(jwtVerifier, getCurrentUser)
+userRouter.route('/refresh-token').post(refreshAccessToken)
 
-userRouter.route('/update-details').post(jwtVerifier, updateAccountDetails)
+userRouter.route('/current-user').get(getCurrentUser)
 
-userRouter.route('/update-avatar').post(jwtVerifier,
+userRouter.route('/update-details').post(updateAccountDetails)
+
+userRouter.route('/update-avatar').post(
     upload.fields([{
         name: "avatar",
         maxCount: 1
     }]),
-    updateAvatar)
+    updateAvatar
+)
+
+userRouter.route('/cart').get(getUserCart)
+
+userRouter.route('/add-cart').post(addToCart)
+
+userRouter.route('/remove-cart/:productId').delete(removeFromCart)
 
 export { userRouter }
