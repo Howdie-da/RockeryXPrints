@@ -1,1 +1,1 @@
-Ecommerce website under the company name RockeryXPrints
+Ecommerce website under the company name RockeryXPrints. It is at an experimental stages
