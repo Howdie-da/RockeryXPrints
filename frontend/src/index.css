@@ -1,1 +1,55 @@
 @import "tailwindcss";
+
+@theme {
+  --font-inter: "Inter", sans-serif;
+  --font-space: "Space Mono", monospace;
+
+  --color-bg-primary: #FFFFFF;
+  --color-bg-inverse: #000000;
+  --color-border-heavy: #000000;
+  --color-text-primary: #000000;
+  --color-text-inverse: #FFFFFF;
+  --color-text-muted: #666666;
+
+  --shadow-solid: 6px 6px 0px 0px #000000;
+  --shadow-solid-lg: 8px 8px 0px 0px #000000;
+  --shadow-solid-sm: 4px 4px 0px 0px #000000;
+}
+
+@utility bg-stripes {
+  background-image: repeating-linear-gradient(45deg, #000000 0px, #000000 2px, #ffffff 2px, #ffffff 8px);
+}
+
+@utility bg-stripes-light {
+  background-image: repeating-linear-gradient(45deg, #e5e5e5 0px, #e5e5e5 2px, #ffffff 2px, #ffffff 8px);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: #ffffff;
+  border-left: 4px solid #000000;
+}
+::-webkit-scrollbar-thumb {
+  background: #000000;
+  border: 2px solid #ffffff;
+}
+
+/* Selection Color */
+::selection {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+/* Reset default styles */
+html {
+  scroll-behavior: smooth;
+}
+html, body {
+  background-color: #ffffff;
+  color: #000000;
+  overflow-x: hidden;
+}
