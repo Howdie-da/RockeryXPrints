@@ -30,10 +30,10 @@ function ProductCard({ product, index, onAdd, isAdded }) {
   const cardRef = useRef(null);
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  const rotateX        = useSpring(useTransform(mouseY, [-1, 1], [8, -8]),  SPRING);
-  const rotateY        = useSpring(useTransform(mouseX, [-1, 1], [-8, 8]),  SPRING);
-  const glareX         = useTransform(mouseX, [-1, 1], [0, 100]);
-  const glareY         = useTransform(mouseY, [-1, 1], [0, 100]);
+  const rotateX = useSpring(useTransform(mouseY, [-1, 1], [8, -8]), SPRING);
+  const rotateY = useSpring(useTransform(mouseX, [-1, 1], [-8, 8]), SPRING);
+  const glareX = useTransform(mouseX, [-1, 1], [0, 100]);
+  const glareY = useTransform(mouseY, [-1, 1], [0, 100]);
   const glareBackground = useTransform(
     [glareX, glareY],
     ([gx, gy]) => `radial-gradient(ellipse at ${gx}% ${gy}%, rgba(255,255,255,0.14) 0%, transparent 60%)`
@@ -43,8 +43,8 @@ function ProductCard({ product, index, onAdd, isAdded }) {
   const handleMove = useCallback((e) => {
     if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
-    mouseX.set((e.clientX - rect.left - rect.width  / 2) / (rect.width  / 2));
-    mouseY.set((e.clientY - rect.top  - rect.height / 2) / (rect.height / 2));
+    mouseX.set((e.clientX - rect.left - rect.width / 2) / (rect.width / 2));
+    mouseY.set((e.clientY - rect.top - rect.height / 2) / (rect.height / 2));
   }, [mouseX, mouseY]);
 
   const handleLeave = useCallback(() => {
@@ -66,7 +66,7 @@ function ProductCard({ product, index, onAdd, isAdded }) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleLeave}
       style={isHovered ? { rotateX, rotateY, transformPerspective: 900, transformStyle: 'preserve-3d', zIndex: 10 } : {}}
-      className="bg-black relative overflow-hidden"
+      className="bg-black relative overflow-hidden w-70 sm:w-[320px] md:w-auto shrink-0 snap-center md:snap-align-none border-2 border-black md:border-0"
     >
       {/* Glare — always rendered, opacity driven by isHovered */}
       <motion.div
@@ -76,7 +76,7 @@ function ProductCard({ product, index, onAdd, isAdded }) {
         style={{ background: glareBackground }}
       />
 
-      <div className="bg-white p-6 h-full flex flex-col justify-between relative z-10 border-2 border-black">
+      <div className="bg-white p-6 h-full flex flex-col justify-between relative z-10">
 
         {/* Image */}
         <div>
@@ -99,10 +99,6 @@ function ProductCard({ product, index, onAdd, isAdded }) {
                   </span>
                 </div>
               )}
-              {/* Edition badge */}
-              <span className="absolute bottom-2 left-2 font-space text-[9px] font-bold bg-black text-white px-1.5 py-0.5 uppercase tracking-wider">
-                LTD ED.
-              </span>
             </div>
           </Link>
 
@@ -134,13 +130,12 @@ function ProductCard({ product, index, onAdd, isAdded }) {
             onClick={(e) => !isSoldOut && onAdd(product, e)}
             disabled={isSoldOut}
             whileTap={!isSoldOut ? { scale: 0.92 } : {}}
-            className={`flex items-center gap-1.5 font-space font-bold uppercase text-xs px-4 py-2.5 border-2 border-black transition-colors duration-100 cursor-pointer ${
-              isSoldOut
+            className={`flex items-center gap-1.5 font-space font-bold uppercase text-xs px-4 py-2.5 border-2 border-black transition-colors duration-100 cursor-pointer ${isSoldOut
                 ? 'opacity-40 cursor-not-allowed bg-neutral-100 text-neutral-400'
                 : isAdded
                   ? 'bg-black text-white'
                   : 'bg-black text-white hover:bg-white hover:text-black'
-            }`}
+              }`}
           >
             {isAdded ? <Check size={13} /> : <Plus size={13} />}
             <span>{isSoldOut ? 'OUT' : isAdded ? 'DONE' : 'ADD'}</span>
@@ -169,7 +164,7 @@ export default function FeaturedProducts({ products, loading = false }) {
       : mockProducts.slice(0, 4);
 
   return (
-    <section id="collections" className="scroll-mt-20 bg-white border-b-4 border-black select-none">
+    <section id="collections" className="scroll-mt-20 bg-white border-b-4 border-black select-none overflow-hidden">
 
       {/* Header */}
       <motion.div
@@ -204,23 +199,32 @@ export default function FeaturedProducts({ products, loading = false }) {
         </Link>
       </motion.div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 bg-black gap-0.5 p-0.5">
+      {/* Grid / Horizontal Scroll on Mobile */}
+      <div
+        id="collections-grid"
+        className="flex md:grid overflow-x-auto overflow-y-hidden md:overflow-hidden snap-x snap-mandatory md:snap-none gap-6 md:gap-0.5 p-6 md:p-0.5 bg-white md:bg-black md:grid-cols-4"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        <style>{`
+          #collections-grid::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
         {loading
           ? Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-white">
-                <SkeletonCard />
-              </div>
-            ))
+            <div key={i} className="bg-white w-70 sm:w-[320px] md:w-auto shrink-0 snap-center md:snap-align-none border-2 border-black md:border-0">
+              <SkeletonCard />
+            </div>
+          ))
           : displayProducts.map((product, index) => (
-              <ProductCard
-                key={product._id ?? index}
-                product={product}
-                index={index}
-                isAdded={!!added[product._id]}
-                onAdd={handleAdd}
-              />
-            ))}
+            <ProductCard
+              key={product._id ?? index}
+              product={product}
+              index={index}
+              isAdded={!!added[product._id]}
+              onAdd={handleAdd}
+            />
+          ))}
       </div>
     </section>
   );

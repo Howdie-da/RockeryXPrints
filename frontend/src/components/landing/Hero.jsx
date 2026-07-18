@@ -97,14 +97,9 @@ function PerspectiveCard({ prod, index, isStackHovered, isHovered, onEnter, onLe
           ) : (
             getProductSvg(prod.slug, index)
           )}
-          {/* Depth corner mark */}
-          <span className="absolute top-2 left-2 font-space text-[9px] font-bold text-white bg-black px-1.5 py-0.5 z-10">
-            {String(cardId).padStart(2, '0')}/{3}
-          </span>
         </div>
-        <div className="flex justify-between items-center font-space text-xs font-bold mt-2">
+        <div className="flex justify-center items-center font-space text-xs font-bold mt-2">
           <span className="truncate mr-2 uppercase">{prod.name}</span>
-          <span>₹{prod.sellingPrice?.toLocaleString('en-IN')}</span>
         </div>
       </div>
     </motion.div>
@@ -247,10 +242,15 @@ export default function Hero({ products }) {
 
         {/* CSS 3D Card Stack */}
         <div
-          className="relative w-70 h-92.5 sm:w-[320px] sm:h-105 flex items-center justify-center"
+          className="relative w-70 h-92.5 sm:w-[320px] sm:h-105 flex items-center justify-center cursor-pointer md:cursor-default"
           style={{ perspective: '1200px' }}
           onMouseEnter={() => setIsStackHovered(true)}
           onMouseLeave={() => { setIsStackHovered(false); setHoveredCard(null); }}
+          onClick={() => {
+            if (screenSize !== 'desktop') {
+              setIsStackHovered(prev => !prev);
+            }
+          }}
         >
           {displayProducts.map((prod, index) => (
             <PerspectiveCard
@@ -272,10 +272,10 @@ export default function Hero({ products }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: isStackHovered ? 0 : 1 }}
           transition={{ duration: 0.3 }}
-          className="absolute bottom-6 left-0 right-0 flex justify-center"
+          className="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none"
         >
           <span className="font-space text-[9px] uppercase tracking-[0.25em] text-neutral-400">
-            ↑ hover to explore
+            {screenSize === 'desktop' ? '↑ hover to explore' : 'tap stack to fan out'}
           </span>
         </motion.div>
       </div>

@@ -90,25 +90,11 @@ export default function BentoAbout() {
     <section
       id="about"
       ref={sectionRef}
-      className="scroll-mt-20 bg-white border-b-4 border-black select-none relative"
+      className="scroll-mt-20 bg-white border-b-4 border-black select-none relative overflow-hidden"
     >
       {/* Parallax depth frames (ambient) */}
       <ParallaxFrames containerRef={sectionRef} />
 
-      {/* Section header */}
-      <div className="border-b-4 border-black px-6 py-8 md:px-12 flex items-end justify-between gap-4 bg-white relative z-10">
-        <div>
-          <span className="font-space text-xs font-bold uppercase tracking-[0.25em] text-neutral-500 block mb-1">
-            // CRAFT PHILOSOPHY
-          </span>
-          <h2 className="font-inter font-black text-4xl md:text-5xl uppercase tracking-tighter leading-none">
-            WHY IT HITS
-          </h2>
-        </div>
-        <div className="font-space text-[10px] uppercase tracking-widest text-neutral-400 text-right hidden md:block">
-          Premium quality.<br />No exceptions.
-        </div>
-      </div>
 
       {/* Bento grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 grid-rows-auto relative z-10">

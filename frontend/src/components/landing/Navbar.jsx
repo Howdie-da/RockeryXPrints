@@ -43,10 +43,10 @@ export default function Navbar() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 h-20 bg-white z-50 select-none transition-[border-bottom-width,box-shadow] duration-200 ${
+      className={`fixed top-0 left-0 right-0 h-20 z-50 select-none transition-[border-bottom-width,box-shadow,background-color] duration-200 ${
         scrolled
-          ? 'border-b-4 border-black shadow-[0_4px_0_0_#000]'
-          : 'border-b-4 border-black'
+          ? 'border-b-2 border-black bg-white/80 backdrop-blur-md shadow-[0_3px_0_0_#000]'
+          : 'border-b-2 border-black bg-white'
       }`}
     >
       <div className="max-w-7xl mx-auto h-full px-6 md:px-12 flex items-center justify-between">
