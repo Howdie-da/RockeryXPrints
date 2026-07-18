@@ -34,8 +34,8 @@ const userSchema = new mongoose.Schema({
 
     cart: [
         {
-            product: {type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true},
-            quantity: {type: Number, min: 1, default: 1}
+            product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+            quantity: { type: Number, min: 1, default: 1 }
         }
     ],
 
@@ -53,10 +53,10 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     }
-}, {timestamps: true})
+}, { timestamps: true })
 
-userSchema.pre("save", async function(){
-    if(!this.isModified("password")) return
+userSchema.pre("save", async function () {
+    if (!this.isModified("password")) return
     this.password = await bcrypt.hash(this.password, 10)
 })
 
@@ -64,7 +64,7 @@ userSchema.methods.isPasswordCorrect = async function (password) {
     return await bcrypt.compare(password, this.password)
 }
 
-userSchema.methods.generateAccessToken = async function() {
+userSchema.methods.generateAccessToken = async function () {
     return jwt.sign(
         {
             _id: this._id,
@@ -73,19 +73,19 @@ userSchema.methods.generateAccessToken = async function() {
         },
         process.env.ACCESS_TOKEN_SECRET,
         {
-            expiresIn: process.env.ACCESS_TOKEN_EXPIRY 
+            expiresIn: process.env.ACCESS_TOKEN_EXPIRY
         }
     )
 }
 
-userSchema.methods.generateRefreshToken = async function() {
+userSchema.methods.generateRefreshToken = async function () {
     return jwt.sign(
         {
             _id: this._id,
         },
         process.env.REFRESH_TOKEN_SECRET,
         {
-            expiresIn: process.env.REFRESH_TOKEN_EXPIRY 
+            expiresIn: process.env.REFRESH_TOKEN_EXPIRY
         }
     )
 }

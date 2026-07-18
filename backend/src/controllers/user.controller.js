@@ -66,9 +66,17 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Error while registering the user.")
     }
 
+    const {accessToken, refreshToken} = await generateToken(user._id)
+
     return res
     .status(201)
-    .json(new ApiResponse(201, createdUser, "User registered successfully!!"))
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(new ApiResponse(201, {
+        user: createdUser,
+        accessToken,
+        refreshToken
+    }, "User registered successfully!!"))
 })
 
 const loginUser = asyncHandler(async (req, res) => {
@@ -197,27 +205,21 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 })
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
-    let {email, fullName} = req.body
+    let {email, fullName, addresses} = req.body
 
-    if (!email && !fullName) {
+    if (!email && !fullName && !addresses) {
         throw new ApiError(400, "Enter a valid credential")
     }
 
-    if (!email) {
-        email = req.user?.email
-    }
-
-    if (!fullName) {
-        fullName = req.user?.fullName
-    }
+    const updateFields = {};
+    if (email) updateFields.email = email;
+    if (fullName) updateFields.fullName = fullName;
+    if (addresses) updateFields.addresses = addresses;
 
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
-            $set: {
-                email,
-                fullName
-            }
+            $set: updateFields
         },
         {
             returnDocument: 'after'
@@ -225,7 +227,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     ).select("-password -refreshToken")
 
     if (!user) {
-        throw new ApiError(500, "Interal Error Occurred.")
+        throw new ApiError(500, "Internal Error Occurred.")
     }
 
     return res

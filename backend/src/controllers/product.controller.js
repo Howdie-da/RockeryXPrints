@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Category } from "../models/category.model.js";
 import { Product } from "../models/product.model.js";
 import { ApiError } from "../utils/ApiError.js";
@@ -293,8 +294,10 @@ const getProducts = asyncHandler(async (req, res) => {
     // ---------------------------------------------
     const matchStage = { parentProduct: null };
 
-    if (category) {
-        // In aggregation, we must explicitly convert the string to a MongoDB ObjectId
+    const isCategoryFilterActive = !!category;
+    const isCategoryObjectId = isCategoryFilterActive && mongoose.Types.ObjectId.isValid(category);
+
+    if (isCategoryObjectId) {
         matchStage.category = new mongoose.Types.ObjectId(category);
     }
 
@@ -332,11 +335,24 @@ const getProducts = asyncHandler(async (req, res) => {
         {
             // $lookup returns an array. $unwind pulls the object out of the array.
             $unwind: "$categoryDetails" 
-        },
-        { 
-            $sort: sortStage 
         }
     ];
+
+    // If category filter is slug or name (not a valid ObjectId), filter post-lookup
+    if (isCategoryFilterActive && !isCategoryObjectId) {
+        pipeline.push({
+            $match: {
+                $or: [
+                    { "categoryDetails.slug": category },
+                    { "categoryDetails.name": { $regex: new RegExp(`^${category}$`, "i") } }
+                ]
+            }
+        });
+    }
+
+    pipeline.push({ 
+        $sort: sortStage 
+    });
 
     // ---------------------------------------------
     // EXECUTE PAGINATION

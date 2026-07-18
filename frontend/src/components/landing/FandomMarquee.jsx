@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
+import { Link } from 'react-router';
 
-export default function FandomMarquee() {
-  const fandoms = [
+export default function FandomMarquee({ tags = [] }) {
+  const displayTags = tags.length > 0 ? tags : [
     'ANIME',
     'GAMING',
     'MANGA',
@@ -14,7 +15,7 @@ export default function FandomMarquee() {
   ];
 
   // Duplicate to make scrolling infinite and seamless
-  const duplicatedFandoms = [...fandoms, ...fandoms, ...fandoms, ...fandoms];
+  const duplicatedFandoms = [...displayTags, ...displayTags, ...displayTags, ...displayTags];
 
   return (
     <section id="fandoms" className="scroll-mt-[80px] bg-black border-b-4 border-black overflow-hidden py-1 select-none">
@@ -29,15 +30,17 @@ export default function FandomMarquee() {
           className="flex whitespace-nowrap"
         >
           {duplicatedFandoms.map((fandom, idx) => (
-            <div
+            <Link
               key={idx}
+              to={`/shop?tag=${encodeURIComponent(fandom.toLowerCase())}`}
               className="inline-block font-space font-bold uppercase text-base md:text-lg tracking-widest text-white py-4 px-10 border-r border-white hover:bg-white hover:text-black transition-colors duration-0 cursor-pointer first:border-l"
             >
               {fandom}
-            </div>
+            </Link>
           ))}
         </motion.div>
       </div>
     </section>
   );
 }
+

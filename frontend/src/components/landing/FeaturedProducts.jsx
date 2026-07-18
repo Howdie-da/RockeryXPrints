@@ -1,87 +1,43 @@
+// src/components/landing/FeaturedProducts.jsx
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { motion } from 'framer-motion';
-import { Heart, Plus, ShoppingCart } from 'lucide-react';
+import { useDispatch } from 'react-redux';
+import { Heart, Plus } from 'lucide-react';
+import { addToCart } from '../../store/cartSlice';
+import { getProductSvg, mockProducts } from '../../data/mockData';
 
-export default function FeaturedProducts() {
+export default function FeaturedProducts({ products }) {
+  const dispatch = useDispatch();
   const [wishlist, setWishlist] = useState([]);
-  
+  const [added, setAdded] = useState({});
+
   const toggleWishlist = (id) => {
-    if (wishlist.includes(id)) {
-      setWishlist(wishlist.filter(item => item !== id));
-    } else {
-      setWishlist([...wishlist, id]);
-    }
+    setWishlist((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
   };
 
-  const products = [
-    {
-      id: 1,
-      name: 'SHINIGAMI // 01',
-      fandom: 'ANIME FANDOM',
-      price: '$45.00',
-      badge: 'LIMITED RUN // 100',
-      svg: (
-        <svg className="w-16 h-16 text-white drop-shadow-[0_4px_0_#000]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10" stroke="black" strokeWidth="2" fill="none" />
-          <path d="M8 14s1.5-2 4-2 4 2 4 2" stroke="black" strokeWidth="2" />
-          <circle cx="9" cy="9" r="1.5" fill="black" />
-          <circle cx="15" cy="9" r="1.5" fill="black" />
-          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="black" strokeWidth="2" />
-        </svg>
-      )
-    },
-    {
-      id: 2,
-      name: 'NEO-TOKYO // 07',
-      fandom: 'CYBERPUNK FANDOM',
-      price: '$45.00',
-      badge: 'NEW DROP',
-      svg: (
-        <svg className="w-16 h-16 text-white drop-shadow-[0_4px_0_#000]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" fill="black" stroke="black" strokeWidth="2" />
-          <circle cx="12" cy="12" r="3.5" fill="white" stroke="black" strokeWidth="2" />
-          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" />
-        </svg>
-      )
-    },
-    {
-      id: 3,
-      name: 'RUNESMITH // 12',
-      fandom: 'GAMING FANDOM',
-      price: '$45.00',
-      badge: 'RESTOCK',
-      svg: (
-        <svg className="w-16 h-16 text-white drop-shadow-[0_4px_0_#000]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="12" cy="12" r="8" stroke="black" strokeWidth="3" fill="none" />
-          <circle cx="12" cy="12" r="5" stroke="white" strokeWidth="2" fill="none" />
-          <path d="M12 2v20M2 12h20" stroke="black" strokeWidth="2" />
-        </svg>
-      )
-    },
-    {
-      id: 4,
-      name: 'DARK KNIGHT // 03',
-      fandom: 'COMICS FANDOM',
-      price: '$50.00',
-      badge: 'ONLY 5 LEFT',
-      svg: (
-        <svg className="w-16 h-16 text-white drop-shadow-[0_4px_0_#000]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M2 10c2 2 4 4 10 0 6 4 8 2 10 0 0-4-3-6-10-6S2 6 2 10Z" fill="black" stroke="black" strokeWidth="2" />
-          <path d="M12 4v16" stroke="black" strokeWidth="2" />
-          <path d="M8 8s2-1 4-1 4 1 4 1" stroke="black" strokeWidth="1.5" />
-        </svg>
-      )
-    }
-  ];
+  const handleAdd = (product, e) => {
+    e.preventDefault();
+    dispatch(addToCart({ product, quantity: 1 }));
+    setAdded((prev) => ({ ...prev, [product._id]: true }));
+    setTimeout(() => setAdded((prev) => ({ ...prev, [product._id]: false })), 1500);
+  };
+
+  // Safe fallback to first four mock products
+  const displayProducts = Array.isArray(products) && products.length === 4
+    ? products
+    : mockProducts.slice(0, 4);
 
   return (
     <section id="collections" className="scroll-mt-20 bg-white border-b-4 border-black select-none">
-      
-      {/* H2 Title Header */}
-      <motion.div 
+
+      {/* Header */}
+      <motion.div
         initial={{ y: 30, opacity: 0 }}
         whileInView={{ y: 0, opacity: 1 }}
-        viewport={{ once: true, margin: "-50px" }}
+        viewport={{ once: true, margin: '-50px' }}
         transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
         className="border-b-4 border-black px-6 py-8 md:px-12 bg-white flex flex-col md:flex-row md:items-end justify-between gap-4"
       >
@@ -93,86 +49,91 @@ export default function FeaturedProducts() {
             INVENTORY
           </h2>
         </div>
-        <div className="font-space text-sm font-bold uppercase border-2 border-black px-4 py-2 bg-neutral-100 flex items-center gap-2">
-          <span className="w-2.5 h-2.5 bg-black"></span>
-          <span>4 ORIGINALS AVAILABLE</span>
-        </div>
+        <Link
+        to='/shop'
+        >
+          <motion.div 
+            whileHover="hover"
+            className="font-space text-sm font-bold uppercase border-2 border-black px-4 py-2 bg-neutral-100 flex items-center gap-2 cursor-pointer"
+          >
+            <motion.div
+              className="w-3 h-3 bg-black border border-white"
+              variants={{
+                hover: { rotate: 45 }
+              }}
+              transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+            />
+            <span>More</span>
+          </motion.div>
+        </Link>
       </motion.div>
 
-      {/* Grid: collapsed borders style */}
-      {/* Parent has top and left border, each card has right and bottom border */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t-0 border-l-0 bg-black gap-1 p-1">
-        {products.map((product, index) => {
-          const isWishlisted = wishlist.includes(product.id);
+      {/* Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 bg-black gap-1 p-1">
+        {displayProducts.map((product, index) => {
+          const isWishlisted = wishlist.includes(product._id);
+          const isAdded = added[product._id];
+          const isSoldOut = product.stock === 0;
+
           return (
-            <motion.div 
-              key={product.id}
+            <motion.div
+              key={product._id}
               initial={{ y: 50, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
-              viewport={{ once: true, margin: "-100px" }}
+              viewport={{ once: true, margin: '-100px' }}
               transition={{ type: 'spring', bounce: 0, duration: 0.6, delay: index * 0.1 }}
-              className="bg-white relative p-6 flex flex-col justify-between border-2 border-black"
+              whileHover={{ x: -6, y: -6, boxShadow: '8px 8px 0px 0px #000000' }}
+              className="bg-black relative border-2 border-black overflow-hidden"
             >
-              {/* Card Container with snappy float on hover */}
-              <motion.div
-                whileHover={{ 
-                  x: -6, 
-                  y: -6, 
-                  boxShadow: '8px 8px 0px 0px #000000'
-                }}
-                transition={{ type: 'spring', bounce: 0, duration: 0.15 }}
-                className="bg-white h-full flex flex-col justify-between relative z-10"
-              >
+              <div className="bg-white p-6 h-full flex flex-col justify-between relative z-10">
                 <div>
-                  {/* Image/Stripe Placeholder */}
-                  <div className="w-full aspect-3/4 bg-stripes border-2 border-black relative flex items-center justify-center mb-6 overflow-hidden">
-                    {product.svg}
-                    
-                    {/* Top-Left Badge */}
-                    <div className="absolute top-0 left-0 bg-black text-white font-space text-[10px] md:text-xs font-bold px-3 py-1.5 border-r-2 border-b-2 border-black uppercase tracking-wider">
-                      {product.badge}
+                  {/* Image area — click goes to detail page */}
+                  <Link to={`/products/${product.slug}`} className="block">
+                    <div className="w-full aspect-3/4 bg-stripes border-2 border-black relative flex items-center justify-center mb-6 overflow-hidden">
+                      {product.images && product.images[0] ? (
+                        <img
+                          src={product.images[0]}
+                          alt={product.name}
+                          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                        />
+                      ) : (
+                        getProductSvg(product.slug, index)
+                      )}
                     </div>
-
-                    {/* Top-Right Wishlist Button */}
-                    <button 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        toggleWishlist(product.id);
-                      }}
-                      className={`absolute top-0 right-0 w-10 h-10 border-l-2 border-b-2 border-black flex items-center justify-center transition-colors duration-75 cursor-pointer ${
-                        isWishlisted ? 'bg-black text-white' : 'bg-white text-black hover:bg-black hover:text-white'
-                      }`}
-                      aria-label="Add to Wishlist"
-                    >
-                      <Heart size={16} fill={isWishlisted ? 'currentColor' : 'none'} strokeWidth={2} />
-                    </button>
-                  </div>
+                  </Link>
 
                   {/* Metadata */}
-                  <div className="font-space">
+                  <Link to={`/products/${product.slug}`} className="block font-space">
                     <span className="text-[11px] font-bold text-neutral-500 tracking-widest uppercase block mb-1">
-                      {product.fandom}
+                      {product.categoryDetails?.name || 'CATEGORY'}
                     </span>
-                    <h3 className="font-space font-extrabold text-lg md:text-xl uppercase tracking-tight text-black mb-2">
+                    <h3 className="font-space font-extrabold text-lg md:text-xl uppercase tracking-tight text-black mb-2 hover:text-neutral-500 transition-colors duration-75">
                       {product.name}
                     </h3>
-                  </div>
+                  </Link>
                 </div>
 
-                {/* Pricing & Add to Cart */}
+                {/* Price + Add */}
                 <div className="flex items-center justify-between mt-4 pt-4 border-t-2 border-dashed border-neutral-300">
                   <span className="font-space font-black text-lg text-black">
-                    {product.price}
+                    ₹{product.sellingPrice?.toLocaleString('en-IN')}
                   </span>
-                  
-                  <button 
-                    className="flex items-center gap-1.5 bg-black text-white font-space font-bold uppercase text-xs px-4 py-2.5 border-2 border-black hover:bg-white hover:text-black transition-colors duration-100 cursor-pointer"
+                  <button
+                    onClick={(e) => !isSoldOut && handleAdd(product, e)}
+                    disabled={isSoldOut}
+                    className={`flex items-center gap-1.5 font-space font-bold uppercase text-xs px-4 py-2.5 border-2 border-black transition-colors duration-100 cursor-pointer ${
+                      isSoldOut
+                        ? 'opacity-40 cursor-not-allowed bg-neutral-100'
+                        : isAdded
+                          ? 'bg-black text-white'
+                          : 'bg-black text-white hover:bg-white hover:text-black'
+                    }`}
                   >
                     <Plus size={14} />
-                    <span>ADD</span>
+                    <span>{isSoldOut ? 'OUT' : isAdded ? '✓' : 'ADD'}</span>
                   </button>
                 </div>
-              </motion.div>
+              </div>
             </motion.div>
           );
         })}

@@ -34,6 +34,20 @@ const cartSlice = createSlice({
                 state.products = state.products.filter(cartItem => cartItem.product._id !== productId);
             }
         },
+        updateQuantity: (state, action) => {
+            const { productId, quantity } = action.payload;
+            const existingItem = state.products.find(item => item.product._id === productId);
+            if (existingItem) {
+                const newQty = Math.max(0, quantity);
+                const diff = newQty - existingItem.quantity;
+                if (newQty === 0) {
+                    state.products = state.products.filter(item => item.product._id !== productId);
+                } else {
+                    existingItem.quantity = newQty;
+                }
+                state.size += diff;
+            }
+        },
         clearCart: (state, action) => {
             state.size = 0
             state.products = []
@@ -41,5 +55,5 @@ const cartSlice = createSlice({
     }
 })
 
-export const { setCart, addToCart, removeFromCart, clearCart } = cartSlice.actions
+export const { setCart, addToCart, removeFromCart, updateQuantity, clearCart } = cartSlice.actions
 export default cartSlice.reducer

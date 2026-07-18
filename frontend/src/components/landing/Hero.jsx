@@ -1,8 +1,12 @@
+// src/components/landing/Hero.jsx
 import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { ArrowRight, ShoppingBag } from 'lucide-react';
+import { getProductSvg, mockProducts } from '../../data/mockData';
 
-export default function Hero() {
+export default function Hero({ products }) {
+  const navigate = useNavigate();
   const [screenSize, setScreenSize] = useState('desktop'); // 'mobile' | 'tablet' | 'desktop'
   const [isStackHovered, setIsStackHovered] = useState(false);
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -25,12 +29,10 @@ export default function Hero() {
   const springTransition = { type: 'spring', bounce: 0, duration: 0.4 };
 
   const getCardProps = (id, baseRotate) => {
-    // Dynamic separation distance based on screen sizes
     let dist = 160;
     if (screenSize === 'mobile') dist = 70;
     if (screenSize === 'tablet') dist = 90;
 
-    // 1. STACKED STATE (Default, container not hovered)
     if (!isStackHovered) {
       return {
         x: 0,
@@ -41,7 +43,6 @@ export default function Hero() {
       };
     }
 
-    // 2. UNRAVELED STATE (Container is hovered)
     let xTarget = 0;
     if (id === 1) xTarget = -dist;
     if (id === 3) xTarget = dist;
@@ -49,21 +50,20 @@ export default function Hero() {
     const isThisHovered = hoveredCard === id;
     const isAnyCardHovered = hoveredCard !== null;
 
-    let scaleTarget = 0.78; // default unraveled scale (decreased)
+    let scaleTarget = 0.78;
     let yTarget = 0;
     let zIndexTarget = 20;
 
     if (isThisHovered) {
-      scaleTarget = 1.0;  // hovered scale (decreased relative to original)
-      yTarget = -35;      // lift it off the table!
-      zIndexTarget = 30;  // pop to top
+      scaleTarget = 1.0;
+      yTarget = -35;
+      zIndexTarget = 30;
     } else if (isAnyCardHovered) {
-      scaleTarget = 0.68; // shrink others even more
-      yTarget = 15;       // push other cards down slightly
-      zIndexTarget = id === 2 ? 22 : 15; // middle card overlaps non-hovered
+      scaleTarget = 0.68;
+      yTarget = 15;
+      zIndexTarget = id === 2 ? 22 : 15;
     } else {
-      // Stack is hovered but no specific card is hovered
-      zIndexTarget = id === 2 ? 22 : 18; // middle card overlaps other cards
+      zIndexTarget = id === 2 ? 22 : 18;
     }
 
     return {
@@ -75,8 +75,13 @@ export default function Hero() {
     };
   };
 
+  // Safe fallback to first three mock products if none passed
+  const displayProducts = Array.isArray(products) && products.length === 3
+    ? products
+    : mockProducts.slice(0, 3);
+
   return (
-    <section id="home" className="scroll-mt-[80px] grid grid-cols-1 lg:grid-cols-2 min-h-[calc(100vh-80px)] border-b-4 border-black bg-white select-none">
+    <section id="home" className="scroll-mt-20 grid grid-cols-1 lg:grid-cols-2 min-h-[calc(100vh-80px)] border-b-4 border-black bg-white select-none">
       
       {/* Left Column: Copy & Actions */}
       <div className="flex flex-col justify-center px-6 py-12 md:px-16 lg:px-20 border-b-4 lg:border-b-0 lg:border-r-4 border-black">
@@ -96,27 +101,19 @@ export default function Hero() {
 
         {/* CTAs */}
         <div className="flex flex-wrap gap-5">
-          <motion.a
-            href="#collections"
+          <motion.div
             whileHover={{ x: 2, y: 2, boxShadow: '4px 4px 0px 0px #000000' }}
             whileTap={{ x: 6, y: 6, boxShadow: '0px 0px 0px 0px #000000' }}
             transition={springTransition}
-            className="flex items-center gap-2 bg-black text-white font-space font-bold uppercase text-sm px-8 py-4 border-4 border-black shadow-solid"
           >
-            Explore Inventory
-            <ShoppingBag size={16} />
-          </motion.a>
-          
-          <motion.a
-            href="#about"
-            whileHover={{ x: 2, y: 2, boxShadow: '4px 4px 0px 0px #000000' }}
-            whileTap={{ x: 6, y: 6, boxShadow: '0px 0px 0px 0px #000000' }}
-            transition={springTransition}
-            className="flex items-center gap-2 bg-white text-black font-space font-bold uppercase text-sm px-8 py-4 border-4 border-black shadow-solid"
-          >
-            Our Process
-            <ArrowRight size={16} />
-          </motion.a>
+            <Link
+              to="/shop"
+              className="flex items-center gap-2 bg-black text-white font-space font-bold uppercase text-sm px-8 py-4 border-4 border-black shadow-solid touch-manipulation"
+            >
+              Explore Inventory
+              <ShoppingBag size={16} />
+            </Link>
+          </motion.div>
         </div>
       </div>
 
@@ -133,89 +130,41 @@ export default function Hero() {
           }}
         >
           
-          {/* Card 1: Bottom (Anime / Shinigami) */}
-          <motion.div
-            animate={getCardProps(1, -10)}
-            onMouseEnter={() => setHoveredCard(1)}
-            onMouseLeave={() => setHoveredCard(null)}
-            transition={springTransition}
-            className="absolute w-full h-full bg-white border-8 border-black shadow-solid p-6 flex flex-col justify-between cursor-pointer"
-          >
-            {/* Matte border & print placeholder */}
-            <div className="w-full h-[85%] border-2 border-black bg-stripes relative flex items-center justify-center">
-              {/* Shinigami Symbol SVG */}
-              <svg className="w-20 h-20 text-white drop-shadow-[0_4px_0_#000]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v7.026C18.343 21.128 22 16.991 22 12c0-5.523-4.477-10-10-10z"/>
-                <circle cx="12" cy="12" r="10" stroke="black" strokeWidth="2" fill="none" />
-                <path d="M8 14s1.5-2 4-2 4 2 4 2" stroke="black" strokeWidth="2" fill="none" />
-                <circle cx="9" cy="9" r="1" fill="black" />
-                <circle cx="15" cy="9" r="1" fill="black" />
-              </svg>
-              <div className="absolute top-2 left-2 bg-black text-white font-space text-[10px] px-1 font-bold">
-                A // 01
-              </div>
-            </div>
-            {/* Title card */}
-            <div className="flex justify-between items-center font-space text-xs font-bold mt-2">
-              <span>SHINIGAMI // 01</span>
-              <span>$45.00</span>
-            </div>
-          </motion.div>
-
-          {/* Card 2: Middle (Cyberpunk Eye) */}
-          <motion.div
-            animate={getCardProps(2, 0)}
-            onMouseEnter={() => setHoveredCard(2)}
-            onMouseLeave={() => setHoveredCard(null)}
-            transition={springTransition}
-            className="absolute w-full h-full bg-white border-8 border-black shadow-solid p-6 flex flex-col justify-between cursor-pointer"
-          >
-            {/* Matte border & print placeholder */}
-            <div className="w-full h-[85%] border-2 border-black bg-stripes relative flex items-center justify-center">
-              {/* Cyberpunk Eye SVG */}
-              <svg className="w-24 h-24 text-white drop-shadow-[0_4px_0_#000]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" fill="black" stroke="black" strokeWidth="2" />
-                <circle cx="12" cy="12" r="3" fill="white" stroke="black" strokeWidth="2" />
-                <circle cx="12" cy="12" r="1" fill="black" />
-                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="white" strokeWidth="2" />
-              </svg>
-              <div className="absolute top-2 left-2 bg-black text-white font-space text-[10px] px-1 font-bold">
-                C // 07
-              </div>
-            </div>
-            {/* Title card */}
-            <div className="flex justify-between items-center font-space text-xs font-bold mt-2">
-              <span>NEO-TOKYO // 07</span>
-              <span>$45.00</span>
-            </div>
-          </motion.div>
-
-          {/* Card 3: Top (Gaming / Runesmith) */}
-          <motion.div
-            animate={getCardProps(3, 10)}
-            onMouseEnter={() => setHoveredCard(3)}
-            onMouseLeave={() => setHoveredCard(null)}
-            transition={springTransition}
-            className="absolute w-full h-full bg-white border-8 border-black shadow-solid p-6 flex flex-col justify-between cursor-pointer"
-          >
-            {/* Matte border & print placeholder */}
-            <div className="w-full h-[85%] border-2 border-black bg-stripes relative flex items-center justify-center">
-              {/* Elden Rune Geometric SVG */}
-              <svg className="w-20 h-20 text-white drop-shadow-[0_4px_0_#000]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="8" stroke="black" strokeWidth="3" />
-                <circle cx="12" cy="12" r="5" stroke="white" strokeWidth="2" />
-                <path d="M12 2v20M2 12h20M5 5l14 14M5 19L19 5" stroke="black" strokeWidth="1.5" />
-              </svg>
-              <div className="absolute top-2 left-2 bg-black text-white font-space text-[10px] px-1 font-bold">
-                G // 12
-              </div>
-            </div>
-            {/* Title card */}
-            <div className="flex justify-between items-center font-space text-xs font-bold mt-2">
-              <span>RUNESMITH // 12</span>
-              <span>$45.00</span>
-            </div>
-          </motion.div>
+          {displayProducts.map((prod, index) => {
+            const cardId = index + 1; // 1, 2, 3
+            // Base rotation for stacked state: card 1 = -10 deg, card 2 = 0 deg, card 3 = 10 deg
+            const baseRotate = index === 0 ? -10 : index === 1 ? 0 : 10;
+            
+            return (
+              <motion.div
+                key={prod._id}
+                animate={getCardProps(cardId, baseRotate)}
+                onMouseEnter={() => setHoveredCard(cardId)}
+                onMouseLeave={() => setHoveredCard(null)}
+                onClick={() => navigate(`/products/${prod.slug}`)}
+                transition={springTransition}
+                className="absolute w-full h-full bg-white border-8 border-black shadow-solid p-6 flex flex-col justify-between cursor-pointer select-none"
+              >
+                {/* Matte border & print placeholder */}
+                <div className="w-full h-[85%] border-2 border-black bg-stripes relative flex items-center justify-center overflow-hidden">
+                  {prod.images && prod.images[0] ? (
+                    <img
+                      src={prod.images[0]}
+                      alt={prod.name}
+                      className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                    />
+                  ) : (
+                    getProductSvg(prod.slug, index)
+                  )}
+                </div>
+                {/* Title card */}
+                <div className="flex justify-between items-center font-space text-xs font-bold mt-2">
+                  <span className="truncate mr-2 uppercase">{prod.name}</span>
+                  <span>₹{prod.sellingPrice?.toLocaleString('en-IN')}</span>
+                </div>
+              </motion.div>
+            );
+          })}
 
         </div>
       </div>

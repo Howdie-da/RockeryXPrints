@@ -53,3 +53,13 @@ html, body {
   color: #000000;
   overflow-x: hidden;
 }
+
+/* Mobile tap & performance optimization */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
