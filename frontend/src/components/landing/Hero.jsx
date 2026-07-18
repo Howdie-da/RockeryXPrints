@@ -1,172 +1,283 @@
 // src/components/landing/Hero.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { motion } from 'framer-motion';
-import { ArrowRight, ShoppingBag } from 'lucide-react';
+import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { ArrowRight, ShoppingBag, Zap } from 'lucide-react';
 import { getProductSvg, mockProducts } from '../../data/mockData';
 
+const SPRING_CONFIG = { stiffness: 220, damping: 28, mass: 0.8 };
+const CARD_SPRING  = { type: 'spring', bounce: 0, duration: 0.4 };
+
+// ─── Mouse-tracked 3D Perspective card ──────────────────────────────────────
+function PerspectiveCard({ prod, index, isStackHovered, isHovered, onEnter, onLeave, onClick, screenSize }) {
+  const cardRef = useRef(null);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+
+  const rotateX = useSpring(useTransform(mouseY, [-1, 1], [12, -12]), SPRING_CONFIG);
+  const rotateY = useSpring(useTransform(mouseX, [-1, 1], [-12, 12]), SPRING_CONFIG);
+  const glareX  = useTransform(mouseX, [-1, 1], [0, 100]);
+  const glareY  = useTransform(mouseY, [-1, 1], [0, 100]);
+  const glareBackground = useTransform(
+    [glareX, glareY],
+    ([gx, gy]) => `radial-gradient(ellipse at ${gx}% ${gy}%, rgba(255,255,255,0.18) 0%, transparent 65%)`
+  );
+
+  const handleMouseMove = useCallback((e) => {
+    if (!cardRef.current || !isHovered) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const cx   = rect.left + rect.width  / 2;
+    const cy   = rect.top  + rect.height / 2;
+    mouseX.set((e.clientX - cx) / (rect.width  / 2));
+    mouseY.set((e.clientY - cy) / (rect.height / 2));
+  }, [isHovered, mouseX, mouseY]);
+
+  const handleMouseLeave = useCallback(() => {
+    mouseX.set(0);
+    mouseY.set(0);
+    onLeave();
+  }, [mouseX, mouseY, onLeave]);
+
+  // Fan-out position logic
+  let dist = 160;
+  if (screenSize === 'mobile') dist = 70;
+  if (screenSize === 'tablet') dist = 90;
+
+  const cardId = index + 1; // 1 | 2 | 3
+  const baseRotate = index === 0 ? -10 : index === 1 ? 0 : 10;
+
+  let animTarget;
+  if (!isStackHovered) {
+    animTarget = {
+      x: 0, y: 0, rotate: baseRotate, scale: 1,
+      zIndex: cardId === 2 ? 12 : cardId === 3 ? 11 : 10,
+    };
+  } else {
+    let xTarget = 0;
+    if (cardId === 1) xTarget = -dist;
+    if (cardId === 3) xTarget = dist;
+    const scaleTarget = isHovered ? 1.0 : 0.76;
+    const yTarget     = isHovered ? -30 : 12;
+    animTarget = {
+      x: xTarget, y: yTarget, rotate: 0, scale: scaleTarget,
+      zIndex: isHovered ? 30 : cardId === 2 ? 22 : 15,
+    };
+  }
+
+  return (
+    <motion.div
+      ref={cardRef}
+      animate={animTarget}
+      transition={CARD_SPRING}
+      onMouseEnter={onEnter}
+      onMouseLeave={handleMouseLeave}
+      onMouseMove={handleMouseMove}
+      onClick={onClick}
+      style={isHovered ? { rotateX, rotateY, transformPerspective: 900, transformStyle: 'preserve-3d' } : {}}
+      className="absolute w-full h-full bg-white border-8 border-black shadow-solid cursor-pointer select-none"
+    >
+      {/* Specular glare — always mounted, opacity animates */}
+      <motion.div
+        className="absolute inset-0 pointer-events-none z-20"
+        animate={{ opacity: isHovered ? 1 : 0 }}
+        transition={{ duration: 0.2 }}
+        style={{ background: glareBackground }}
+      />
+
+      {/* Image matte */}
+      <div className="relative flex flex-col justify-between p-6 w-full h-full">
+        <div className="w-full h-[85%] border-2 border-black relative flex items-center justify-center overflow-hidden bg-neutral-100">
+          {prod.images && prod.images[0] ? (
+            <img
+              src={prod.images[0]}
+              alt={prod.name}
+              className="w-full h-full object-cover"
+              draggable={false}
+            />
+          ) : (
+            getProductSvg(prod.slug, index)
+          )}
+          {/* Depth corner mark */}
+          <span className="absolute top-2 left-2 font-space text-[9px] font-bold text-white bg-black px-1.5 py-0.5 z-10">
+            {String(cardId).padStart(2, '0')}/{3}
+          </span>
+        </div>
+        <div className="flex justify-between items-center font-space text-xs font-bold mt-2">
+          <span className="truncate mr-2 uppercase">{prod.name}</span>
+          <span>₹{prod.sellingPrice?.toLocaleString('en-IN')}</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Main Hero ───────────────────────────────────────────────────────────────
 export default function Hero({ products }) {
   const navigate = useNavigate();
-  const [screenSize, setScreenSize] = useState('desktop'); // 'mobile' | 'tablet' | 'desktop'
+  const [screenSize, setScreenSize]       = useState('desktop');
   const [isStackHovered, setIsStackHovered] = useState(false);
-  const [hoveredCard, setHoveredCard] = useState(null);
+  const [hoveredCard, setHoveredCard]       = useState(null);
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 640) {
-        setScreenSize('mobile');
-      } else if (window.innerWidth < 1024) {
-        setScreenSize('tablet');
-      } else {
-        setScreenSize('desktop');
-      }
+      const w = window.innerWidth;
+      setScreenSize(w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop');
     };
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const springTransition = { type: 'spring', bounce: 0, duration: 0.4 };
-
-  const getCardProps = (id, baseRotate) => {
-    let dist = 160;
-    if (screenSize === 'mobile') dist = 70;
-    if (screenSize === 'tablet') dist = 90;
-
-    if (!isStackHovered) {
-      return {
-        x: 0,
-        y: 0,
-        rotate: baseRotate,
-        scale: 1,
-        zIndex: id === 2 ? 12 : id === 3 ? 11 : 10,
-      };
-    }
-
-    let xTarget = 0;
-    if (id === 1) xTarget = -dist;
-    if (id === 3) xTarget = dist;
-
-    const isThisHovered = hoveredCard === id;
-    const isAnyCardHovered = hoveredCard !== null;
-
-    let scaleTarget = 0.78;
-    let yTarget = 0;
-    let zIndexTarget = 20;
-
-    if (isThisHovered) {
-      scaleTarget = 1.0;
-      yTarget = -35;
-      zIndexTarget = 30;
-    } else if (isAnyCardHovered) {
-      scaleTarget = 0.68;
-      yTarget = 15;
-      zIndexTarget = id === 2 ? 22 : 15;
-    } else {
-      zIndexTarget = id === 2 ? 22 : 18;
-    }
-
-    return {
-      x: xTarget,
-      y: yTarget,
-      rotate: 0,
-      scale: scaleTarget,
-      zIndex: zIndexTarget,
-    };
-  };
-
-  // Safe fallback to first three mock products if none passed
-  const displayProducts = Array.isArray(products) && products.length === 3
-    ? products
-    : mockProducts.slice(0, 3);
+  const displayProducts =
+    Array.isArray(products) && products.length >= 3
+      ? products.slice(0, 3)
+      : mockProducts.slice(0, 3);
 
   return (
-    <section id="home" className="scroll-mt-20 grid grid-cols-1 lg:grid-cols-2 min-h-[calc(100vh-80px)] border-b-4 border-black bg-white select-none">
-      
-      {/* Left Column: Copy & Actions */}
+    <section
+      id="home"
+      className="scroll-mt-20 grid grid-cols-1 lg:grid-cols-2 min-h-[calc(100vh-80px)] border-b-4 border-black bg-white select-none"
+    >
+      {/* ── Left: Copy & CTAs ── */}
       <div className="flex flex-col justify-center px-6 py-12 md:px-16 lg:px-20 border-b-4 lg:border-b-0 lg:border-r-4 border-black">
-        <span className="font-space text-xs md:text-sm font-bold uppercase tracking-[0.25em] bg-black text-white px-3 py-1.5 self-start mb-6 border border-black shadow-solid-sm">
-          EST. 2026 // LIMITED RUNS
-        </span>
-        
-        <h1 className="font-inter font-black text-5xl md:text-7xl xl:text-8xl leading-[0.9] tracking-tighter uppercase mb-6">
-          YOUR FANDOM.<br />
-          <span className="bg-black text-white px-3 py-1 inline-block mt-2">IN A BOX.</span>
-        </h1>
-        
-        <p className="font-space text-sm md:text-base text-neutral-600 leading-relaxed max-w-lg mb-10">
-          Heavyweight archival paper. Pure monochrome pigments. Encased in raw 20mm industrial frames. 
-          Limited to exactly 100 prints per fandom, hand-numbered. No colors. No clutter. Just raw obsession.
-        </p>
+
+        {/* Eyebrow */}
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
+          className="flex items-center gap-3 mb-6"
+        >
+          <span className="font-space text-xs font-bold uppercase tracking-[0.25em] bg-black text-white px-3 py-1.5 border border-black shadow-solid-sm">
+            EST. 2026
+          </span>
+        </motion.div>
+
+        {/* H1 */}
+        <motion.h1
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', bounce: 0, duration: 0.6, delay: 0.1 }}
+          className="font-inter font-black text-5xl md:text-7xl xl:text-8xl leading-[0.88] tracking-tighter uppercase mb-6"
+        >
+          YOUR{' '}
+          <span className="relative inline-block">
+            FANDOM
+          </span>
+          <br />
+          <span className="bg-black text-white px-3 py-1 inline-block mt-3">IN A BOX.</span>
+        </motion.h1>
+
+        {/* Body copy */}
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', bounce: 0, duration: 0.6, delay: 0.2 }}
+          className="font-space text-sm md:text-base text-neutral-600 leading-relaxed max-w-lg mb-10"
+        >
+          Heavyweight archival paper. Pure monochrome pigments. Encased in raw 20mm industrial frames.
+          Limited to exactly 100 prints per fandom, hand-numbered.{' '}
+          <strong className="text-black">No colors. No clutter. Just raw obsession.</strong>
+        </motion.p>
 
         {/* CTAs */}
-        <div className="flex flex-wrap gap-5">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', bounce: 0, duration: 0.6, delay: 0.3 }}
+          className="flex flex-wrap gap-4"
+        >
           <motion.div
-            whileHover={{ x: 2, y: 2, boxShadow: '4px 4px 0px 0px #000000' }}
-            whileTap={{ x: 6, y: 6, boxShadow: '0px 0px 0px 0px #000000' }}
-            transition={springTransition}
+            whileHover={{ x: -4, y: -4, boxShadow: '8px 8px 0px 0px #000000' }}
+            whileTap={{ x: 2, y: 2, boxShadow: '2px 2px 0px 0px #000000' }}
+            transition={{ type: 'spring', stiffness: 500, damping: 20 }}
           >
             <Link
               to="/shop"
-              className="flex items-center gap-2 bg-black text-white font-space font-bold uppercase text-sm px-8 py-4 border-4 border-black shadow-solid touch-manipulation"
+              className="flex items-center gap-2 bg-black text-white font-space font-bold uppercase text-sm px-8 py-4 border-4 border-black shadow-solid"
             >
               Explore Inventory
               <ShoppingBag size={16} />
             </Link>
           </motion.div>
-        </div>
+
+          <motion.div
+            whileHover={{ x: -4, y: -4, boxShadow: '6px 6px 0px 0px #000000' }}
+            whileTap={{ x: 2, y: 2, boxShadow: '1px 1px 0px 0px #000000' }}
+            transition={{ type: 'spring', stiffness: 500, damping: 20 }}
+          >
+            <Link
+              to="/categories"
+              className="flex items-center gap-2 bg-white text-black font-space font-bold uppercase text-sm px-8 py-4 border-4 border-black shadow-solid"
+            >
+              Browse Fandoms
+              <ArrowRight size={16} />
+            </Link>
+          </motion.div>
+        </motion.div>
+
+        {/* Stat strip */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.55 }}
+          className="flex gap-8 mt-12 pt-8 border-t-2 border-dashed border-neutral-300"
+        >
+          {[['100', 'prints / run'], ['20mm', 'frame depth'], ['∞', 'fandoms']].map(([val, label]) => (
+            <div key={label} className="flex flex-col">
+              <span className="font-inter font-black text-2xl md:text-3xl tracking-tighter">{val}</span>
+              <span className="font-space text-[10px] uppercase tracking-widest text-neutral-500">{label}</span>
+            </div>
+          ))}
+        </motion.div>
       </div>
 
-      {/* Right Column: Rotating Frame Stack Showcase */}
+      {/* ── Right: CSS 3D Card Stack ── */}
       <div className="relative flex items-center justify-center bg-[#F5F5F5] bg-stripes-light px-8 py-16 overflow-hidden min-h-125 lg:min-h-0">
-        
-        {/* Frame Stack Container */}
-        <div 
-          className="relative w-70 h-92.5 sm:w-[320px] sm:h-105 flex items-center justify-center"
-          onMouseEnter={() => setIsStackHovered(true)}
-          onMouseLeave={() => {
-            setIsStackHovered(false);
-            setHoveredCard(null);
-          }}
-        >
-          
-          {displayProducts.map((prod, index) => {
-            const cardId = index + 1; // 1, 2, 3
-            // Base rotation for stacked state: card 1 = -10 deg, card 2 = 0 deg, card 3 = 10 deg
-            const baseRotate = index === 0 ? -10 : index === 1 ? 0 : 10;
-            
-            return (
-              <motion.div
-                key={prod._id}
-                animate={getCardProps(cardId, baseRotate)}
-                onMouseEnter={() => setHoveredCard(cardId)}
-                onMouseLeave={() => setHoveredCard(null)}
-                onClick={() => navigate(`/products/${prod.slug}`)}
-                transition={springTransition}
-                className="absolute w-full h-full bg-white border-8 border-black shadow-solid p-6 flex flex-col justify-between cursor-pointer select-none"
-              >
-                {/* Matte border & print placeholder */}
-                <div className="w-full h-[85%] border-2 border-black bg-stripes relative flex items-center justify-center overflow-hidden">
-                  {prod.images && prod.images[0] ? (
-                    <img
-                      src={prod.images[0]}
-                      alt={prod.name}
-                      className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                    />
-                  ) : (
-                    getProductSvg(prod.slug, index)
-                  )}
-                </div>
-                {/* Title card */}
-                <div className="flex justify-between items-center font-space text-xs font-bold mt-2">
-                  <span className="truncate mr-2 uppercase">{prod.name}</span>
-                  <span>₹{prod.sellingPrice?.toLocaleString('en-IN')}</span>
-                </div>
-              </motion.div>
-            );
-          })}
 
+        {/* Noise texture overlay */}
+        <div
+          className="absolute inset-0 opacity-[0.03] pointer-events-none"
+          style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\'/%3E%3C/svg%3E")', backgroundSize: '200px 200px' }}
+        />
+
+        {/* Section label */}
+        <div className="absolute top-6 left-6">
         </div>
+
+        {/* CSS 3D Card Stack */}
+        <div
+          className="relative w-70 h-92.5 sm:w-[320px] sm:h-105 flex items-center justify-center"
+          style={{ perspective: '1200px' }}
+          onMouseEnter={() => setIsStackHovered(true)}
+          onMouseLeave={() => { setIsStackHovered(false); setHoveredCard(null); }}
+        >
+          {displayProducts.map((prod, index) => (
+            <PerspectiveCard
+              key={prod._id ?? index}
+              prod={prod}
+              index={index}
+              isStackHovered={isStackHovered}
+              isHovered={hoveredCard === index + 1}
+              onEnter={() => setHoveredCard(index + 1)}
+              onLeave={() => setHoveredCard(null)}
+              onClick={() => navigate(`/products/${prod.slug}`)}
+              screenSize={screenSize}
+            />
+          ))}
+        </div>
+
+        {/* Floating interaction hint */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: isStackHovered ? 0 : 1 }}
+          transition={{ duration: 0.3 }}
+          className="absolute bottom-6 left-0 right-0 flex justify-center"
+        >
+          <span className="font-space text-[9px] uppercase tracking-[0.25em] text-neutral-400">
+            ↑ hover to explore
+          </span>
+        </motion.div>
       </div>
     </section>
   );

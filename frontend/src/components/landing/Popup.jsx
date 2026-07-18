@@ -34,7 +34,7 @@ export default function Popup({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 15 }}
             transition={spring}
-            className="relative z-10 w-full max-w-md bg-white border-4 border-black p-6 md:p-8 shadow-[8px_8px_0px_0px_#000000] text-center flex flex-col items-center"
+            className="relative z-10 w-full max-w-md bg-white border-4 border-black p-6 md:p-8 shadow-solid-lg text-center flex flex-col items-center"
           >
             {/* Warning Icon Badge */}
             <div className="w-12 h-12 border-2 border-black flex items-center justify-center bg-yellow-100 text-black mb-4 shrink-0">

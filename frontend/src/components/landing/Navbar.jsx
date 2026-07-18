@@ -9,75 +9,115 @@ import { logout } from '../../store/authSlice';
 const spring = { type: 'spring', stiffness: 300, damping: 25 };
 
 const NAV_LINKS = [
-  { name: 'HOME',        href: '/',           isRoute: true },
-  { name: 'COLLECTIONS', href: '/categories', isRoute: true },
-  { name: 'SHOP',        href: '/shop',        isRoute: true },
+  { name: 'HOME',        href: '/' },
+  { name: 'COLLECTIONS', href: '/categories' },
+  { name: 'SHOP',        href: '/shop' },
 ];
 
 export default function Navbar() {
-  const [isOpen, setIsOpen] = useState(false);
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
+  const [isOpen,    setIsOpen]    = useState(false);
+  const [scrolled,  setScrolled]  = useState(false);
+  const dispatch   = useDispatch();
+  const navigate   = useNavigate();
   const { pathname } = useLocation();
   const { isAuthenticated } = useSelector((s) => s.auth);
   const cartSize = useSelector((s) => s.cart.size);
 
+  // Close menu on route change + scroll to top
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    setIsOpen(false);
   }, [pathname]);
+
+  // Scroll depth detection — adds visual weight after 40px
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const handleLogout = () => {
     dispatch(logout());
     navigate('/');
-    setIsOpen(false);
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-20 bg-white border-b-4 border-black z-50 select-none">
+    <header
+      className={`fixed top-0 left-0 right-0 h-20 bg-white z-50 select-none transition-[border-bottom-width,box-shadow] duration-200 ${
+        scrolled
+          ? 'border-b-4 border-black shadow-[0_4px_0_0_#000]'
+          : 'border-b-4 border-black'
+      }`}
+    >
       <div className="max-w-7xl mx-auto h-full px-6 md:px-12 flex items-center justify-between">
 
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-3 shrink-0 group">
           <motion.div
             className="w-4 h-4 bg-black border border-white cursor-pointer"
-            whileHover={{ rotate: 45 }}
+            whileHover={{ rotate: 45, scale: 1.2 }}
             transition={{ type: 'spring', stiffness: 500, damping: 15 }}
           />
-          <span className="font-inter font-black text-xl md:text-2xl tracking-tighter uppercase">
+          <span className="font-inter font-black text-xl md:text-2xl tracking-tighter uppercase group-hover:opacity-75 transition-opacity duration-100">
             ROCKERYXPRINTS
           </span>
         </Link>
 
         {/* Center Links (Desktop) */}
-        <nav className="hidden md:flex items-center gap-8 font-space text-sm font-bold tracking-wider">
+        <nav className="hidden md:flex items-center gap-8 font-space text-sm font-bold tracking-wider" aria-label="Main navigation">
           {NAV_LINKS.map((link) => (
-            <Link
+            <NavLink
               key={link.name}
               to={link.href}
+              end={link.href === '/'}
               className="relative py-1 group overflow-hidden"
             >
-              <span className="relative z-10 transition-colors duration-75 group-hover:text-neutral-500">
-                {link.name}
-              </span>
-              <span className="absolute left-0 bottom-0 w-full h-0.5 bg-black scale-x-0 group-hover:scale-x-100 transition-transform duration-100 ease-in-out origin-left" />
-            </Link>
+              {({ isActive }) => (
+                <>
+                  <span className={`relative z-10 transition-colors duration-75 ${isActive ? 'text-black' : 'group-hover:text-neutral-500'}`}>
+                    {link.name}
+                  </span>
+                  {/* Active indicator */}
+                  {isActive && (
+                    <motion.span
+                      layoutId="nav-active"
+                      className="absolute left-0 bottom-0 w-full h-0.5 bg-black"
+                      transition={spring}
+                    />
+                  )}
+                  {/* Hover underline (only for non-active) */}
+                  {!isActive && (
+                    <span className="absolute left-0 bottom-0 w-full h-0.5 bg-neutral-400 scale-x-0 group-hover:scale-x-100 transition-transform duration-150 ease-out origin-left" />
+                  )}
+                </>
+              )}
+            </NavLink>
           ))}
         </nav>
 
         {/* Right side — Desktop */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Cart */}
+          {/* Cart with spring badge */}
           <Link
             to="/cart"
             className="relative flex items-center justify-center w-10 h-10 border-2 border-black hover:bg-black hover:text-white transition-colors duration-75"
-            aria-label="Cart"
+            aria-label={`Cart — ${cartSize} item${cartSize !== 1 ? 's' : ''}`}
           >
             <ShoppingBag size={16} />
-            {cartSize > 0 && (
-              <span className="absolute -top-2 -right-2 w-5 h-5 bg-black text-white font-space font-bold text-[10px] flex items-center justify-center border-2 border-white">
-                {cartSize > 9 ? '9+' : cartSize}
-              </span>
-            )}
+            <AnimatePresence>
+              {cartSize > 0 && (
+                <motion.span
+                  key="badge"
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 600, damping: 18 }}
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-black text-white font-space font-bold text-[10px] flex items-center justify-center border-2 border-white"
+                >
+                  {cartSize > 9 ? '9+' : cartSize}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </Link>
 
           {/* Auth */}
@@ -89,24 +129,42 @@ export default function Navbar() {
               <User size={13} /> DASHBOARD
             </Link>
           ) : (
-            <Link
-              to="/auth"
-              className="inline-flex items-center gap-2 bg-black text-white font-space font-bold uppercase text-xs px-5 py-3 border-2 border-black hover:bg-white hover:text-black transition-colors duration-100 shadow-solid-sm hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5"
+            <motion.div
+              whileHover={{ x: -3, y: -3, boxShadow: '6px 6px 0px 0px #000000' }}
+              whileTap={{ x: 1, y: 1, boxShadow: '1px 1px 0px 0px #000000' }}
+              transition={{ type: 'spring', stiffness: 500, damping: 20 }}
             >
-              ENTER SYSTEM
-              <ArrowRight size={14} />
-            </Link>
+              <Link
+                to="/auth"
+                className="inline-flex items-center gap-2 bg-black text-white font-space font-bold uppercase text-xs px-5 py-3 border-2 border-black shadow-solid-sm"
+              >
+                ENTER SYSTEM
+                <ArrowRight size={14} />
+              </Link>
+            </motion.div>
           )}
         </div>
 
-        {/* Mobile Toggle Button */}
-        <button
+        {/* Mobile Toggle */}
+        <motion.button
           onClick={() => setIsOpen(!isOpen)}
+          whileTap={{ scale: 0.92 }}
           className="md:hidden flex items-center justify-center w-10 h-10 border-2 border-black bg-white hover:bg-black hover:text-white transition-colors duration-100"
           aria-label="Toggle Navigation Menu"
+          aria-expanded={isOpen}
         >
-          {isOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span
+              key={isOpen ? 'close' : 'open'}
+              initial={{ rotate: -90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={{ rotate: 90, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              {isOpen ? <X size={20} /> : <Menu size={20} />}
+            </motion.span>
+          </AnimatePresence>
+        </motion.button>
       </div>
 
       {/* Mobile Drawer */}
@@ -122,13 +180,18 @@ export default function Navbar() {
             <ul className="font-space font-bold uppercase text-sm divide-y-2 divide-black">
               {NAV_LINKS.map((link) => (
                 <li key={link.name}>
-                  <Link
+                  <NavLink
                     to={link.href}
+                    end={link.href === '/'}
                     onClick={() => setIsOpen(false)}
-                    className="block px-6 py-4 hover:bg-black hover:text-white transition-colors duration-75"
+                    className={({ isActive }) =>
+                      `block px-6 py-4 transition-colors duration-75 ${
+                        isActive ? 'bg-black text-white' : 'hover:bg-black hover:text-white'
+                      }`
+                    }
                   >
                     {link.name}
-                  </Link>
+                  </NavLink>
                 </li>
               ))}
 
@@ -153,13 +216,13 @@ export default function Navbar() {
                     <Link
                       to="/dashboard"
                       onClick={() => setIsOpen(false)}
-                      className="flex items-center justify-center gap-2 w-full bg-black text-white px-5 py-4 border-2 border-black font-bold text-center hover:bg-white hover:text-black transition-colors duration-100"
+                      className="flex items-center justify-center gap-2 w-full bg-black text-white px-5 py-4 border-2 border-black font-bold hover:bg-white hover:text-black transition-colors duration-100"
                     >
                       <User size={14} /> DASHBOARD
                     </Link>
                     <button
                       onClick={handleLogout}
-                      className="w-full border-2 border-black px-5 py-3 font-bold text-xs text-center hover:bg-black hover:text-white transition-colors duration-100"
+                      className="w-full border-2 border-black px-5 py-3 font-bold text-xs hover:bg-black hover:text-white transition-colors duration-100 cursor-pointer"
                     >
                       LOGOUT
                     </button>
@@ -168,7 +231,7 @@ export default function Navbar() {
                   <Link
                     to="/auth"
                     onClick={() => setIsOpen(false)}
-                    className="flex items-center justify-center gap-2 w-full bg-black text-white px-5 py-4 border-2 border-black hover:bg-white hover:text-black font-bold text-center transition-colors duration-100"
+                    className="flex items-center justify-center gap-2 w-full bg-black text-white px-5 py-4 border-2 border-black hover:bg-white hover:text-black font-bold transition-colors duration-100"
                   >
                     ENTER SYSTEM
                     <ArrowRight size={16} />

@@ -18,7 +18,7 @@ export default function FandomMarquee({ tags = [] }) {
   const duplicatedFandoms = [...displayTags, ...displayTags, ...displayTags, ...displayTags];
 
   return (
-    <section id="fandoms" className="scroll-mt-[80px] bg-black border-b-4 border-black overflow-hidden py-1 select-none">
+    <section id="fandoms" className="scroll-mt-20 bg-black border-b-4 border-black overflow-hidden py-1 select-none">
       <div className="flex w-max">
         <motion.div
           animate={{ x: [0, "-25%"] }}

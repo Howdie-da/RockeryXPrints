@@ -4,57 +4,69 @@
   --font-inter: "Inter", sans-serif;
   --font-space: "Space Mono", monospace;
 
-  --color-bg-primary: #FFFFFF;
-  --color-bg-inverse: #000000;
+  --color-bg-primary:   #FFFFFF;
+  --color-bg-inverse:   #000000;
   --color-border-heavy: #000000;
   --color-text-primary: #000000;
   --color-text-inverse: #FFFFFF;
-  --color-text-muted: #666666;
+  --color-text-muted:   #666666;
 
-  --shadow-solid: 6px 6px 0px 0px #000000;
+  --shadow-solid:    6px 6px 0px 0px #000000;
   --shadow-solid-lg: 8px 8px 0px 0px #000000;
   --shadow-solid-sm: 4px 4px 0px 0px #000000;
 }
 
+/* ── Utility patterns ─────────────────────────────────────────────────────── */
 @utility bg-stripes {
-  background-image: repeating-linear-gradient(45deg, #000000 0px, #000000 2px, #ffffff 2px, #ffffff 8px);
+  background-image: repeating-linear-gradient(
+    45deg,
+    #000000 0px, #000000 2px,
+    #ffffff 2px, #ffffff 8px
+  );
 }
 
 @utility bg-stripes-light {
-  background-image: repeating-linear-gradient(45deg, #e5e5e5 0px, #e5e5e5 2px, #ffffff 2px, #ffffff 8px);
+  background-image: repeating-linear-gradient(
+    45deg,
+    #e5e5e5 0px, #e5e5e5 2px,
+    #ffffff 2px, #ffffff 8px
+  );
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
-}
-::-webkit-scrollbar-track {
-  background: #ffffff;
-  border-left: 4px solid #000000;
-}
-::-webkit-scrollbar-thumb {
-  background: #000000;
-  border: 2px solid #ffffff;
+/* Fine crosshatch — used for premium surface textures */
+@utility bg-crosshatch {
+  background-image:
+    repeating-linear-gradient(0deg,   transparent, transparent 11px, #e5e5e5 11px, #e5e5e5 12px),
+    repeating-linear-gradient(90deg,  transparent, transparent 11px, #e5e5e5 11px, #e5e5e5 12px);
 }
 
-/* Selection Color */
+/* ── Custom Scrollbar ─────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #ffffff; border-left: 3px solid #000000; }
+::-webkit-scrollbar-thumb { background: #000000; border: 2px solid #ffffff; }
+::-webkit-scrollbar-thumb:hover { background: #333333; }
+
+/* ── Selection ───────────────────────────────────────────────────────────── */
 ::selection {
   background-color: #000000;
   color: #ffffff;
 }
 
-/* Reset default styles */
+/* ── Base reset ──────────────────────────────────────────────────────────── */
 html {
   scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
+
 html, body {
   background-color: #ffffff;
   color: #000000;
   overflow-x: hidden;
 }
 
-/* Mobile tap & performance optimization */
+/* ── Tap highlight & GPU hints ───────────────────────────────────────────── */
 button, a, [role="button"] {
   -webkit-tap-highlight-color: transparent;
 }
@@ -62,4 +74,31 @@ button, a, [role="button"] {
 * {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+/* ── Focus-visible: accessible but styled ───────────────────────────────── */
+:focus-visible {
+  outline: 3px solid #000000;
+  outline-offset: 2px;
+}
+
+/* Remove default focus ring (we handle it above) */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ── Smooth image rendering ──────────────────────────────────────────────── */
+img {
+  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* ── Animation performance class ────────────────────────────────────────── */
+.will-tilt {
+  will-change: transform;
+}
+
+/* ── Three.js canvas layer ───────────────────────────────────────────────── */
+canvas {
+  display: block;
 }
