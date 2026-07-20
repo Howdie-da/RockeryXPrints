@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { Category } from "../models/category.model.js";
+import { Collection } from "../models/collection.model.js";
 import { Product } from "../models/product.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
@@ -394,10 +395,152 @@ const getProductBySlug = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, productData, "Product and variants fetched successfully"));
 });
 
+const addCollection = asyncHandler(async (req, res) => {
+    const { name, searchTag, description } = req.body
+
+    if (!name) {
+        throw new ApiError(400, "Enter the Collection name.")
+    }
+
+    const tag = (searchTag || name).trim()
+    const slug = name.toLowerCase().trim().replaceAll(' ', '-')
+
+    const existingCollection = await Collection.findOne({
+        $or: [{ name }, { slug }]
+    });
+
+    if (existingCollection) {
+        throw new ApiError(400, "Collection with this name already exists.");
+    }
+
+    const coverImagePath = req.files?.coverImage?.[0]?.path
+
+    if (!coverImagePath) {
+        throw new ApiError(400, "Upload cover photo for collection")
+    }
+
+    const coverImage = await uploadOnCloudinary(coverImagePath)
+
+    if (!coverImage) {
+        throw new ApiError(500, "Internal error occurred while uploading cover photo")
+    }
+
+    const collection = await Collection.create({
+        name,
+        slug,
+        searchTag: tag,
+        coverImage: coverImage.url,
+        description: description || ''
+    })
+
+    if (!collection) {
+        throw new ApiError(500, "Internal Error Occurred")
+    }
+
+    return res
+    .status(201)
+    .json(new ApiResponse(201, collection, "Collection created Successfully"))
+})
+
+const getCollections = asyncHandler(async (req, res) => {
+    const allCollections = await Collection.find().lean()
+
+    const collectionsWithCount = await Promise.all(
+        allCollections.map(async (col) => {
+            const count = await Product.countDocuments({
+                searchTags: { $in: [col.searchTag.toLowerCase(), col.slug] }
+            });
+            return { ...col, productCount: count };
+        })
+    );
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, collectionsWithCount, "Collections fetched successfully"))
+})
+
+const deleteCollection = asyncHandler(async (req, res) => {
+    const { collectionId } = req.params;
+
+    if (!collectionId) {
+        throw new ApiError(400, "Choose a collection to delete")
+    }
+
+    const existingCollection = await Collection.findById(collectionId);
+
+    if (!existingCollection) {
+        throw new ApiError(404, "Collection does not exist.");
+    }
+
+    if (existingCollection.coverImage) {
+        await deleteOnCloudinary(existingCollection.coverImage);
+    }
+
+    await existingCollection.deleteOne()
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Collection deleted successfully"))
+})
+
+const updateCollection = asyncHandler(async (req, res) => {
+    const { collectionId } = req.params;
+    const { name, searchTag, description } = req.body;
+
+    if (!collectionId) {
+        throw new ApiError(400, "Collection ID is required.");
+    }
+
+    const existingCollection = await Collection.findById(collectionId);
+    if (!existingCollection) {
+        throw new ApiError(404, "Collection not found.");
+    }
+
+    if (name && name.trim() !== existingCollection.name) {
+        const slug = name.toLowerCase().trim().replaceAll(' ', '-');
+        const duplicate = await Collection.findOne({ slug, _id: { $ne: collectionId } });
+        if (duplicate) {
+            throw new ApiError(400, "Another collection with this name already exists.");
+        }
+        existingCollection.name = name.trim();
+        existingCollection.slug = slug;
+    }
+
+    if (searchTag) {
+        existingCollection.searchTag = searchTag.trim().toLowerCase();
+    }
+
+    if (description !== undefined) {
+        existingCollection.description = description.trim();
+    }
+
+    const coverImagePath = req.files?.coverImage?.[0]?.path;
+    if (coverImagePath) {
+        if (existingCollection.coverImage) {
+            await deleteOnCloudinary(existingCollection.coverImage);
+        }
+        const newCoverImage = await uploadOnCloudinary(coverImagePath);
+        if (!newCoverImage) {
+            throw new ApiError(500, "Error uploading new cover photo");
+        }
+        existingCollection.coverImage = newCoverImage.url;
+    }
+
+    await existingCollection.save();
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, existingCollection, "Collection updated successfully"));
+})
+
 export {
     addCategory,
     getCategories,
     deleteCategory,
+    addCollection,
+    getCollections,
+    updateCollection,
+    deleteCollection,
     addProduct,
     updateProduct,
     deleteProduct,

@@ -1,29 +1,47 @@
 // src/pages/ProductDetailPage.jsx
-// Displays a single product detail view strictly loaded from the backend database
-// Allows admins to edit the product specifications or delete it from database
+// Displays a single product detail view loaded strictly from the backend database
+// Top-notch industry professional brutalist ecommerce product experience
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useDispatch, useSelector } from 'react-redux';
-import { ShoppingBag, Plus, Minus, ChevronDown, Edit3, Trash2, Upload, X } from 'lucide-react';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  ShoppingBag,
+  Plus,
+  Minus,
+  ChevronDown,
+  Edit3,
+  Trash2,
+  Upload,
+  X,
+  Truck,
+  ShieldCheck,
+  Maximize2,
+  Check,
+  Zap,
+  Award,
+  Share2,
+  ArrowRight
+} from 'lucide-react';
 import { addToCart as addToCartSlice } from '../store/cartSlice';
-import { getProductSvg } from '../data/mockData';
-import { getProductBySlug, updateProductAPI, deleteProductAPI } from '../services/api';
+import { getProductSvg, mockProducts } from '../data/mockData';
+import { getProductBySlug, updateProductAPI, deleteProductAPI, getProducts } from '../services/api';
 import Navbar from '../components/landing/Navbar';
+import Footer from '../components/landing/Footer';
 import Popup from '../components/landing/Popup';
 
 const spring = { type: 'spring', bounce: 0, duration: 0.3 };
 
-function AccordionSection({ title, children }) {
-  const [open, setOpen] = useState(false);
+function AccordionSection({ title, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="border-t-2 border-black">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between py-4 font-space font-bold text-xs md:text-sm uppercase tracking-wider text-black hover:text-neutral-500 transition-colors duration-75 touch-manipulation"
+        className="w-full flex items-center justify-between py-4 font-space font-bold text-xs md:text-sm uppercase tracking-wider text-black hover:text-neutral-500 transition-colors duration-75 touch-manipulation text-left"
       >
-        {title}
-        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={spring}>
+        <span>{title}</span>
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={spring} className="shrink-0 ml-2">
           <ChevronDown size={18} />
         </motion.span>
       </button>
@@ -48,16 +66,23 @@ export default function ProductDetailPage() {
   const { slug } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  
+
   const { user } = useSelector((s) => s.auth);
   const isAdmin = user?.role === 'admin';
 
   const [product, setProduct] = useState(null);
+  const [relatedProducts, setRelatedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [activeThumb, setActiveThumb] = useState(0);
+  const [selectedSize, setSelectedSize] = useState('12" × 16"');
+  const [selectedFrame, setSelectedFrame] = useState('20MM BLACK WOOD');
+
+  // Fullscreen Image Lightbox state
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   // Edit form states
   const [editOpen, setEditOpen] = useState(false);
@@ -82,6 +107,9 @@ export default function ProductDetailPage() {
         const data = res.data?.data;
         if (data) {
           setProduct(data);
+          setActiveThumb(0);
+          setQty(1);
+
           // Initialize edit states
           setEditName(data.name || '');
           setEditDesc(data.description || '');
@@ -92,6 +120,37 @@ export default function ProductDetailPage() {
           setEditSku(data.sku || '');
           setEditTagsInput(data.searchTags?.join(', ') || '');
           setEditFeatures(data.features || []);
+
+          // Fetch related products strictly matching the FIRST searchTag
+          const firstSearchTag = Array.isArray(data.searchTags) && data.searchTags.length > 0
+            ? data.searchTags[0].toLowerCase().trim()
+            : null;
+
+          getProducts()
+            .then((pRes) => {
+              const allProds = pRes.data?.data?.docs || pRes.data?.data?.products || pRes.data?.data || [];
+              if (Array.isArray(allProds)) {
+                const otherProds = allProds.filter((p) => p.slug !== slug);
+
+                let matched = [];
+                if (firstSearchTag) {
+                  // Filter products that contain the current product's first searchTag
+                  matched = otherProds.filter((p) => {
+                    const pTags = Array.isArray(p.searchTags) ? p.searchTags.map((t) => t.toLowerCase().trim()) : [];
+                    return pTags.includes(firstSearchTag);
+                  });
+                }
+
+                // If fewer than 4 items match the first searchTag, fill remaining slots with fallback items
+                if (matched.length < 4) {
+                  const remaining = otherProds.filter((p) => !matched.some((m) => m._id === p._id));
+                  matched = [...matched, ...remaining];
+                }
+
+                setRelatedProducts(matched.slice(0, 4));
+              }
+            })
+            .catch(() => setRelatedProducts(mockProducts.slice(0, 4)));
         } else {
           setErrorMsg('PRODUCT NOT REGISTERED IN INVENTORY.');
         }
@@ -104,6 +163,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     fetchProductDetails();
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [slug]);
 
   const handleAddToCart = () => {
@@ -111,6 +171,20 @@ export default function ProductDetailPage() {
     dispatch(addToCartSlice({ product, quantity: qty }));
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
+  };
+
+  const handleBuyNow = () => {
+    if (!product) return;
+    dispatch(addToCartSlice({ product, quantity: qty }));
+    navigate('/cart');
+  };
+
+  const handleShare = () => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
   };
 
   // Submit Edit API
@@ -125,20 +199,17 @@ export default function ProductDetailPage() {
     formData.append('description', editDesc);
     formData.append('mrp', editMrp);
     formData.append('sellingPrice', editSellingPrice);
-    formData.append('category', product.category?._id || product.category); // unchangeable
+    formData.append('category', product.category?._id || product.category);
     formData.append('stock', editStock);
     formData.append('deliveryDays', editDeliveryDays);
     formData.append('sku', editSku);
 
-    // Tags
-    const tagsArr = editTagsInput.split(',').map(t => t.trim().toLowerCase()).filter(t => t);
-    tagsArr.forEach(tag => formData.append('searchTags[]', tag));
+    const tagsArr = editTagsInput.split(',').map((t) => t.trim().toLowerCase()).filter((t) => t);
+    tagsArr.forEach((tag) => formData.append('searchTags[]', tag));
 
-    // Features
-    const featuresArr = editFeatures.filter(f => f.key && f.value);
+    const featuresArr = editFeatures.filter((f) => f.key && f.value);
     formData.append('features', JSON.stringify(featuresArr));
 
-    // Images
     for (let i = 0; i < editImageFiles.length; i++) {
       formData.append('images', editImageFiles[i]);
     }
@@ -178,9 +249,11 @@ export default function ProductDetailPage() {
     return (
       <div className="min-h-screen bg-white text-black font-space">
         <Navbar />
-        <div className="pt-30 px-6 text-center text-xs uppercase tracking-widest text-neutral-400">
-          <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1 }}>■</motion.span>
-          LOADING PRODUCT DETAILS...
+        <div className="pt-36 pb-20 px-6 text-center text-xs uppercase tracking-widest text-neutral-500">
+          <motion.span animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1 }} className="inline-block mr-2">
+            ■
+          </motion.span>
+          LOADING PRODUCT INVENTORY...
         </div>
       </div>
     );
@@ -188,417 +261,536 @@ export default function ProductDetailPage() {
 
   if (errorMsg && !editOpen && !product) {
     return (
-      <div className="min-h-screen bg-white text-black font-space">
-        <Navbar />
-        <div className="pt-35 px-6 text-center">
-          <h1 className="font-inter font-black text-3xl uppercase tracking-tighter text-neutral-300 mb-6">
-            {errorMsg || 'PRODUCT NOT FOUND'}
-          </h1>
-          <Link to="/shop" className="border-2 border-black px-6 py-3 font-bold text-xs uppercase hover:bg-black hover:text-white transition-colors">
-            RETURN TO SHOP
-          </Link>
+      <div className="min-h-screen bg-white text-black font-space flex flex-col justify-between">
+        <div>
+          <Navbar />
+          <div className="pt-36 pb-20 px-6 text-center">
+            <h1 className="font-inter font-black text-3xl md:text-5xl uppercase tracking-tighter text-neutral-300 mb-6">
+              {errorMsg || 'PRODUCT NOT FOUND'}
+            </h1>
+            <Link
+              to="/shop"
+              className="inline-block border-2 border-black bg-black text-white px-8 py-4 font-bold text-xs uppercase hover:bg-white hover:text-black transition-colors"
+            >
+              RETURN TO SHOP INVENTORY
+            </Link>
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
 
   const svgIcon = getProductSvg(product.slug, 0);
   const saving = product.mrp - product.sellingPrice;
+  const discountPercent = product.mrp ? Math.round((saving / product.mrp) * 100) : 0;
+  const totalImages = product.images && product.images.length > 0 ? product.images.length : 1;
 
   return (
-    <div className="min-h-screen bg-white text-black selection:bg-black selection:text-white">
-      <Navbar />
+    <div className="min-h-screen bg-white text-black selection:bg-black selection:text-white flex flex-col justify-between antialiased">
+      <div>
+        <Navbar />
 
-      {/* Breadcrumb */}
-      <div className="pt-20 border-b-2 border-black px-4 md:px-12 py-2.5 font-space text-[10px] md:text-xs text-neutral-500 uppercase tracking-widest flex items-center gap-1.5 overflow-x-auto whitespace-nowrap bg-white">
-        <Link to="/" className="hover:text-black transition-colors shrink-0">HOME</Link>
-        <span className="shrink-0">/</span>
-        <Link to="/categories" className="hover:text-black transition-colors shrink-0">{product.category?.name || 'CATEGORY'}</Link>
-        <span className="shrink-0">/</span>
-        <span className="text-black font-bold shrink-0 truncate max-w-d40">{product.name}</span>
+        {/* Breadcrumb Navigation */}
+        <div className="pt-20 border-b-2 border-black px-6 md:px-12 py-3 font-space text-[10px] md:text-xs text-neutral-500 uppercase tracking-widest flex items-center justify-between overflow-x-auto whitespace-nowrap bg-neutral-50">
+          <div className="flex items-center gap-2">
+            <Link to="/" className="hover:text-black transition-colors shrink-0">HOME</Link>
+            <span className="shrink-0 text-neutral-300">/</span>
+            <Link to="/categories" className="hover:text-black transition-colors shrink-0">
+              {product.category?.name || 'CATEGORY'}
+            </Link>
+            <span className="shrink-0 text-neutral-300">/</span>
+            <span className="text-black font-bold shrink-0 truncate max-w-xs">{product.name}</span>
+          </div>
+        </div>
+
+        {/* Main PDP Grid */}
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 min-h-[calc(100vh-120px)] border-b-4 border-black">
+
+          {/* ── LEFT: INTERACTIVE IMAGE GALLERY (7 cols on lg) ── */}
+          <div className="lg:col-span-7 border-b-4 lg:border-b-0 lg:border-r-4 border-black bg-[#FAFAFA] flex flex-col justify-between relative select-none">
+
+            {/* Main Display Canvas */}
+            <div className="relative flex-1 flex items-center justify-center p-6 md:p-12 min-h-95 md:min-h-130">
+
+              {/* Fullscreen Magnify Button */}
+              <button
+                onClick={() => setLightboxOpen(true)}
+                className="absolute top-4 right-4 bg-white text-black border-2 border-black p-2 hover:bg-black hover:text-white transition-colors duration-75 z-20 shadow-solid-sm cursor-pointer"
+                title="EXPAND FULLSCREEN VIEW"
+              >
+                <Maximize2 size={16} />
+              </button>
+
+              {/* Image Container */}
+              <div
+                onClick={() => setLightboxOpen(true)}
+                className="overflow-hidden group cursor-zoom-in relative flex items-center justify-center max-w-full max-h-[65vh]"
+              >
+                {product.images && product.images[activeThumb] ? (
+                  <img
+                    src={product.images[activeThumb]}
+                    alt={product.name}
+                    className="max-h-[60vh] w-auto object-contain transition-transform duration-500 group-hover:scale-[1.03]"
+                  />
+                ) : (
+                  <div className="w-64 h-80 flex items-center justify-center p-8 bg-stripes-light border-2 border-black">
+                    {svgIcon}
+                  </div>
+                )}
+              </div>
+
+              {/* Stock / Urgency Badge */}
+              <div className="absolute bottom-4 left-4 flex flex-col gap-1 z-10">
+                {product.stock <= 10 && (
+                  <span className="bg-black text-white font-space text-[10px] font-bold px-3 py-1.5 uppercase tracking-widest border-2 border-black shadow-solid-sm">
+                    {product.stock === 0 ? 'SOLD OUT' : `LIMITED RUN // ONLY ${product.stock} LEFT`}
+                  </span>
+                )}
+              </div>
+
+              {/* Image Index Tag */}
+              <span className="absolute bottom-4 right-4 font-space text-[10px] font-bold text-neutral-400 uppercase tracking-widest bg-white border border-black px-2.5 py-1">
+                {String(activeThumb + 1).padStart(2, '0')} / {String(totalImages).padStart(2, '0')}
+              </span>
+            </div>
+
+            {/* Thumbnail Navigation Strip */}
+            <div className="border-t-2 border-black bg-white grid grid-cols-4 divide-x-2 divide-black">
+              {product.images && product.images.length > 0 ? (
+                product.images.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveThumb(i)}
+                    className={`aspect-square p-2 bg-neutral-50 flex items-center justify-center transition-all cursor-pointer relative overflow-hidden ${activeThumb === i ? 'bg-white ring-4 ring-inset ring-black opacity-100' : 'opacity-50 hover:opacity-100'
+                      }`}
+                  >
+                    <img src={img} alt={`thumb-${i}`} className="w-full h-full object-cover" />
+                  </button>
+                ))
+              ) : (
+                [0, 1, 2, 3].map((i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveThumb(i)}
+                    className={`aspect-square p-2 bg-neutral-50 flex items-center justify-center transition-all cursor-pointer relative ${activeThumb === i ? 'bg-white ring-4 ring-inset ring-black opacity-100' : 'opacity-50 hover:opacity-100'
+                      }`}
+                  >
+                    <div className="w-6 h-6 text-neutral-400">{svgIcon}</div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* ── RIGHT: PRODUCT SPECS & ACTION PANEL (5 cols on lg) ── */}
+          <div className="lg:col-span-5 flex flex-col p-6 md:p-10 bg-white justify-between">
+            <div>
+              {/* Category + SKU Header Bar */}
+              <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b-2 border-neutral-200 font-space">
+                <span className="text-[10px] font-bold uppercase tracking-widest border-2 border-black px-2.5 py-1 bg-black text-white">
+                  {product.category?.name || 'COLLECTIBLE PRINT'}
+                </span>
+                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
+                  SKU: {product.sku}
+                </span>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => { setEditOpen(!editOpen); setErrorMsg(''); }}
+                    className="border-2 border-black bg-white hover:bg-black hover:text-white transition-colors px-3 py-1 font-space font-bold text-[10px] uppercase tracking-wider ml-auto flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 size={12} />
+                    <span>{editOpen ? 'CANCEL EDIT' : 'EDIT PRODUCT'}</span>
+                  </button>
+                )}
+              </div>
+
+              {editOpen && isAdmin ? (
+                /* ── ADMIN EDIT PRODUCT FORM ── */
+                <form onSubmit={handleUpdateProduct} className="flex flex-col gap-4 font-space py-2">
+                  <div className="border-b-2 border-black pb-2 flex items-center justify-between">
+                    <h2 className="font-inter font-black text-lg uppercase tracking-tight">🛠 EDIT PRODUCT SPECS</h2>
+                    <button
+                      type="button"
+                      onClick={() => setDeletePopupOpen(true)}
+                      className="text-red-600 hover:text-white hover:bg-red-600 transition-colors px-2 py-1 border border-red-600 flex items-center gap-1 font-bold text-[9px]"
+                    >
+                      <Trash2 size={11} /> DELETE
+                    </button>
+                  </div>
+
+                  {errorMsg && (
+                    <div className="border-2 border-black bg-black text-white text-[10px] font-bold uppercase px-3 py-2">
+                      ⚠ {errorMsg}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-neutral-500">PRODUCT NAME</label>
+                    <input
+                      type="text" required value={editName} onChange={(e) => setEditName(e.target.value)}
+                      className="w-full bg-white border-2 border-black px-3 py-2 text-xs uppercase focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-neutral-500">DESCRIPTION</label>
+                    <textarea
+                      required value={editDesc} onChange={(e) => setEditDesc(e.target.value)}
+                      rows={3} className="w-full bg-white border-2 border-black px-3 py-2 text-xs uppercase focus:outline-none resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-neutral-500 block mb-1">MRP (INR)</label>
+                      <input
+                        type="number" required value={editMrp} onChange={(e) => setEditMrp(e.target.value)}
+                        className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-neutral-500 block mb-1">SELLING PRICE</label>
+                      <input
+                        type="number" required value={editSellingPrice} onChange={(e) => setEditSellingPrice(e.target.value)}
+                        className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-neutral-500 block mb-1">STOCK COUNT</label>
+                      <input
+                        type="number" required value={editStock} onChange={(e) => setEditStock(e.target.value)}
+                        className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-neutral-500 block mb-1">DELIVERY DAYS</label>
+                      <input
+                        type="number" required value={editDeliveryDays} onChange={(e) => setEditDeliveryDays(e.target.value)}
+                        className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-neutral-500 block mb-1">SKU</label>
+                      <input
+                        type="text" value={editSku} onChange={(e) => setEditSku(e.target.value)}
+                        className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs uppercase focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-neutral-500 block mb-1">SEARCH TAGS</label>
+                      <input
+                        type="text" value={editTagsInput} onChange={(e) => setEditTagsInput(e.target.value)}
+                        className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs uppercase focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Specification key-value fields list */}
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-neutral-500">SPECIFICATIONS</label>
+                      <button type="button" onClick={addFeatureRow} className="border border-black px-2 py-0.5 font-bold text-[8px] hover:bg-black hover:text-white transition-colors">
+                        + ADD ROW
+                      </button>
+                    </div>
+                    <div className="space-y-1.5">
+                      {editFeatures.map((feat, idx) => (
+                        <div key={idx} className="flex gap-2">
+                          <input
+                            type="text" placeholder="KEY" value={feat.key} onChange={(e) => updateFeatureRow(idx, 'key', e.target.value)}
+                            className="flex-1 bg-white border-2 border-black px-2 py-1 text-xs focus:outline-none"
+                          />
+                          <input
+                            type="text" placeholder="VALUE" value={feat.value} onChange={(e) => updateFeatureRow(idx, 'value', e.target.value)}
+                            className="flex-1 bg-white border-2 border-black px-2 py-1 text-xs focus:outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Replace images */}
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-neutral-500">REPLACE IMAGES (OPTIONAL)</label>
+                    <div className="relative border-2 border-dashed border-black bg-white p-3 text-center cursor-pointer">
+                      <input
+                        type="file" multiple accept="image/*" onChange={(e) => setEditImageFiles(Array.from(e.target.files))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <Upload size={14} className="mx-auto text-neutral-400 mb-1" />
+                      <span className="text-[10px] font-bold uppercase text-neutral-500">
+                        {editImageFiles.length > 0 ? `${editImageFiles.length} FILES SELECTED` : 'SELECT IMAGES TO OVERWRITE'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit" disabled={submitting}
+                    className="w-full bg-black text-white font-space font-bold uppercase text-xs py-4 border-2 border-black hover:bg-white hover:text-black transition-colors cursor-pointer mt-2"
+                  >
+                    {submitting ? 'SAVING CHANGES...' : 'SAVE PRODUCT DETAILS'}
+                  </button>
+                </form>
+              ) : (
+                /* ── REGULAR PRODUCT DETAILS VIEW ── */
+                <div>
+                  {/* Product Title */}
+                  <h1 className="font-inter font-black text-3xl sm:text-4xl md:text-5xl uppercase tracking-tighter leading-none text-black mb-3">
+                    {product.name}
+                  </h1>
+
+                  {/* Rating + Sold Count */}
+                  <div className="flex flex-wrap items-center gap-3 font-space text-xs text-neutral-500 uppercase tracking-wider mb-6">
+                    <div className="flex items-center gap-1 text-black font-bold">
+                      <span>★ {product.rating || '5.0'}</span>
+                    </div>
+                    {isAdmin && (
+                      <>
+                        <span>·</span>
+                        <span className="font-bold text-black">{product.salesCount || 0} UNITS DISPATCHED</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Price Banner */}
+                  <div className="border-4 border-black p-5 mb-6 bg-white shadow-solid-sm flex flex-col justify-between">
+                    <div className="flex items-baseline gap-3">
+                      <span className="font-space font-black text-4xl md:text-5xl text-black tracking-tight">
+                        ₹{product.sellingPrice?.toLocaleString('en-IN')}
+                      </span>
+                      {saving > 0 && (
+                        <span className="font-space text-base text-neutral-400 line-through">
+                          ₹{product.mrp?.toLocaleString('en-IN')}
+                        </span>
+                      )}
+                    </div>
+
+                    {saving > 0 && (
+                      <div className="mt-2 flex items-center gap-2 font-space text-xs">
+                        <span className="bg-black text-white font-bold px-2.5 py-1 uppercase text-[10px]">
+                          SAVE ({discountPercent}% OFF)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quantity Selector */}
+                  <div className="flex items-center justify-between mb-6 font-space">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">QUANTITY</span>
+                    <div className="flex items-center border-2 border-black bg-white">
+                      <button
+                        onClick={() => setQty(Math.max(1, qty - 1))}
+                        className="w-10 h-10 flex items-center justify-center border-r-2 border-black hover:bg-black hover:text-white transition-colors cursor-pointer touch-manipulation"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="w-12 text-center font-bold text-sm">{qty}</span>
+                      <button
+                        onClick={() => setQty(Math.min(product.stock || 99, qty + 1))}
+                        className="w-10 h-10 flex items-center justify-center border-l-2 border-black hover:bg-black hover:text-white transition-colors cursor-pointer touch-manipulation"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Action CTA Buttons */}
+                  <div className="flex items-center gap-3 mb-8">
+                    <motion.button
+                      onClick={handleAddToCart}
+                      disabled={product.stock === 0}
+                      whileTap={{ scale: 0.98 }}
+                      transition={spring}
+                      className={`flex-1 flex items-center justify-center gap-3 font-space font-black uppercase text-sm py-4 border-4 border-black shadow-solid transition-colors cursor-pointer ${product.stock === 0
+                        ? 'bg-neutral-100 text-neutral-400 border-neutral-300 cursor-not-allowed shadow-none'
+                        : added
+                          ? 'bg-black text-white'
+                          : 'bg-black text-white hover:bg-white hover:text-black'
+                        }`}
+                    >
+                      <ShoppingBag size={18} />
+                      {product.stock === 0 ? 'SOLD OUT' : added ? '✓ ADDED TO INVENTORY' : 'ADD TO CART'}
+                    </motion.button>
+
+                    <button
+                      onClick={handleShare}
+                      className="bg-white hover:bg-black text-black hover:text-white border-4 border-black p-4 font-space font-bold text-xs uppercase flex items-center justify-center gap-2 shadow-solid transition-colors cursor-pointer shrink-0"
+                      title="SHARE THIS PRODUCT"
+                    >
+                      <Share2 size={18} />
+                      <span className="hidden sm:inline">{copiedLink ? '✓ COPIED!' : 'SHARE'}</span>
+                    </button>
+                  </div>
+
+                  {/* Description Paragraph */}
+                  <div className="mb-8">
+                    <h4 className="font-space text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-2">
+                      CURATOR NOTES
+                    </h4>
+                    <p className="font-space text-xs md:text-sm text-neutral-700 leading-relaxed uppercase">
+                      {product.description}
+                    </p>
+                  </div>
+
+                  {/* Accordion Sections */}
+                  <div className="border-b-2 border-black bg-white">
+                    {product.features && product.features.length > 0 && (
+                      <AccordionSection title="SPECS & DIMENSIONS" defaultOpen={true}>
+                        <table className="w-full font-space text-xs">
+                          <tbody>
+                            {product.features.map((f) => (
+                              <tr key={f.key} className="border-t border-neutral-200">
+                                <td className="py-2 pr-3 text-neutral-500 uppercase tracking-wider w-2/5">{f.key}</td>
+                                <td className="py-2 font-bold uppercase text-right md:text-left">{f.value}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </AccordionSection>
+                    )}
+
+                    <AccordionSection title="SHIPPING & HANDLING">
+                      <div className="font-space text-xs text-neutral-600 leading-relaxed space-y-1.5">
+                        <p>✓ FREE RIGID MAILER SHIPPING ON ALL ORDERS.</p>
+                        <p>✓ ESTIMATED DISPATCH: {product.deliveryDays || 5} BUSINESS DAYS.</p>
+                        <p>✓ SHIPS IN FLAT REINFORCED PACKAGING (NO ROLL TUBES).</p>
+                        <p>✓ LIVE TRACKING PROVIDED POST DISPATCH.</p>
+                      </div>
+                    </AccordionSection>
+
+                    <AccordionSection title="MATERIALS & ARCHIVAL QUALITY">
+                      <div className="font-space text-xs text-neutral-600 leading-relaxed space-y-1.5">
+                        <p>✓ 300 GSM HEAVYWEIGHT ARCHIVAL MATTE PAPER (ACID-FREE).</p>
+                        <p>✓ HIGH-RESOLUTION MONOCHROME PIGMENT INKJET PRINTING.</p>
+                        <p>✓ 20MM SOLID WOOD MATTE BLACK FRAME WITH CORNER REINFORCEMENTS.</p>
+                        <p>✓ 3MM GALLERY-GRADE ANTI-GLARE PROTECTIVE GLASS.</p>
+                      </div>
+                    </AccordionSection>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── RECOMMENDED FRAMES SECTION ── */}
+        {relatedProducts.length > 0 && (
+          <section className="bg-white border-b-4 border-black py-12 px-6 md:px-12 select-none">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 pb-4 border-b-2 border-black">
+                <div>
+                  <h3 className="font-inter font-black text-3xl md:text-4xl uppercase tracking-tighter">
+                    YOU MAY ALSO LIKE
+                  </h3>
+                </div>
+
+                <Link
+                  to="/shop"
+                  className="font-space font-bold text-xs uppercase border-2 border-black px-4 py-2.5 bg-white hover:bg-black hover:text-white transition-colors flex items-center gap-2 self-start sm:self-auto"
+                >
+                  <span>VIEW ENTIRE SHOP</span>
+                  <ArrowRight size={14} />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {relatedProducts.map((relProd, idx) => (
+                  <motion.div
+                    key={relProd._id || idx}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-40px' }}
+                    transition={{ type: 'spring', bounce: 0, duration: 0.4, delay: idx * 0.08 }}
+                    onClick={() => navigate(`/products/${relProd.slug}`)}
+                    className="border-2 border-black bg-white p-4 flex flex-col justify-between group hover:shadow-solid cursor-pointer transition-all duration-150"
+                  >
+                    <div>
+                      <div className="w-full aspect-3/4 bg-neutral-100 border-2 border-black relative mb-4 overflow-hidden flex items-center justify-center">
+                        {relProd.images && relProd.images[0] ? (
+                          <img
+                            src={relProd.images[0]}
+                            alt={relProd.name}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center p-4">
+                            {getProductSvg(relProd.slug, idx)}
+                          </div>
+                        )}
+                      </div>
+                      <span className="font-space text-[9px] font-bold text-neutral-400 tracking-widest uppercase block mb-1">
+                        {relProd.category?.name || 'CATEGORY'}
+                      </span>
+                      <h4 className="font-space font-extrabold text-sm uppercase tracking-tight text-black mb-2 group-hover:text-neutral-500 transition-colors">
+                        {relProd.name}
+                      </h4>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t-2 border-dashed border-neutral-200">
+                      <span className="font-space font-black text-base text-black">
+                        ₹{relProd.sellingPrice?.toLocaleString('en-IN')}
+                      </span>
+                      <span className="font-space text-[10px] font-bold uppercase border border-black px-2 py-1 bg-neutral-100">
+                        VIEW →
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
       </div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-[58%_42%]">
+      {/* Footer Component */}
+      <Footer />
 
-        {/* ── IMAGE PANEL ── */}
-        <div className="border-b-4 lg:border-b-0 lg:border-r-4 border-black bg-[#F5F5F5] flex flex-col">
-          
-          {/* Main canvas */}
-          <div className="flex items-center justify-center bg-stripes-light border-b-2 border-black py-8 px-4 relative"
-               style={{ minHeight: 'clamp(280px, 50vw, 520px)' }}>
+      {/* Fullscreen Image Lightbox Modal */}
+      <AnimatePresence>
+        {lightboxOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 md:p-8"
+            onClick={() => setLightboxOpen(false)}
+          >
+            <button
+              onClick={() => setLightboxOpen(false)}
+              className="absolute top-6 right-6 text-white border-2 border-white p-2 hover:bg-white hover:text-black transition-colors cursor-pointer z-50"
+            >
+              <X size={20} />
+            </button>
 
-            {/* Clean active poster box without double frame borders */}
-            <div className="bg-white border-4 border-black shadow-[6px_6px_0px_0px_#000] overflow-hidden group"
-                 style={{ width: 'clamp(180px, 48vw, 320px)', aspectRatio: '3/4' }}>
+            <div
+              className="relative max-w-4xl max-h-[85vh] bg-white border-4 border-white shadow-2xl p-2"
+              onClick={(e) => e.stopPropagation()}
+            >
               {product.images && product.images[activeThumb] ? (
                 <img
                   src={product.images[activeThumb]}
                   alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  className="max-w-full max-h-[80vh] object-contain mx-auto"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-neutral-300">{svgIcon}</div>
+                <div className="w-80 h-96 flex items-center justify-center bg-stripes-light">
+                  {svgIcon}
+                </div>
               )}
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {/* Low-stock badge */}
-            {product.stock <= 10 && (
-              <div className="absolute bottom-3 left-3 bg-black text-white font-space text-[9px] md:text-xs font-bold px-2 md:px-3 py-1 md:py-1.5 uppercase tracking-wider border-2 border-black z-10 shadow-[2px_2px_0_0_#fff]">
-                {product.stock === 0 ? 'SOLD OUT' : `ONLY ${product.stock} LEFT`}
-              </div>
-            )}
-          </div>
-
-          {/* Thumbnail strip */}
-          <div className="grid grid-cols-4 bg-white border-b-2 md:border-b-0 border-black">
-            {product.images && product.images.length > 0 ? (
-              product.images.map((img, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveThumb(i)}
-                  className={`aspect-square bg-stripes-light flex items-center justify-center border-r-2 border-black last:border-r-0 touch-manipulation transition-all cursor-pointer ${
-                    activeThumb === i ? 'ring-4 ring-inset ring-black opacity-100' : 'opacity-40 hover:opacity-75'
-                  }`}
-                >
-                  <img src={img} alt="thumb" className="w-full h-full object-cover" />
-                </button>
-              ))
-            ) : (
-              [0, 1, 2, 3].map((i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveThumb(i)}
-                  className={`aspect-square bg-stripes-light flex items-center justify-center border-r-2 border-black last:border-r-0 touch-manipulation transition-all cursor-pointer ${
-                    activeThumb === i ? 'ring-4 ring-inset ring-black opacity-100' : 'opacity-40 hover:opacity-75'
-                  }`}
-                >
-                  <div className="w-6 h-6 md:w-8 md:h-8 opacity-50">{svgIcon}</div>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* ── PRODUCT DETAILS (OR EDIT PANEL) ── */}
-        <div className="flex flex-col px-4 pt-6 pb-28 md:pb-10 md:px-10 md:py-8 overflow-y-auto bg-white">
-          
-          {/* Category + SKU + Admin edit button */}
-          <div className="flex items-center gap-2 mb-3">
-            <span className="font-space text-[9px] md:text-xs font-bold uppercase tracking-widest border-2 border-black px-2 md:px-3 py-0.5 md:py-1 bg-black text-white">
-              {product.category?.name || 'PRINT CATEGORY'}
-            </span>
-            <span className="font-space text-[9px] md:text-xs text-neutral-500 uppercase tracking-widest">
-              {product.sku}
-            </span>
-
-            {/* Admin Toggle edit view */}
-            {isAdmin && (
-              <button
-                onClick={() => { setEditOpen(!editOpen); setErrorMsg(''); }}
-                className="border-2 border-black bg-black text-white hover:bg-white hover:text-black transition-colors px-2.5 py-1 font-space font-bold text-[9px] uppercase tracking-wider ml-auto flex items-center gap-1 cursor-pointer touch-manipulation"
-              >
-                <Edit3 size={11} />
-                <span>{editOpen ? 'CANCEL' : 'EDIT'}</span>
-              </button>
-            )}
-          </div>
-
-          {editOpen && isAdmin ? (
-            /* ── ADMIN EDIT PRODUCT FORM ── */
-            <form onSubmit={handleUpdateProduct} className="flex flex-col gap-5 font-space">
-              <div className="border-b-2 border-black pb-2 flex items-center justify-between">
-                <h2 className="font-inter font-black text-xl uppercase tracking-tighter">🛠 EDIT PRODUCT SPECS</h2>
-                <button
-                  type="button"
-                  onClick={() => setDeletePopupOpen(true)}
-                  className="text-red-600 hover:text-white hover:bg-red-600 transition-colors p-1.5 border border-red-600 flex items-center gap-1 font-bold text-[9px]"
-                >
-                  <Trash2 size={11} /> DELETE
-                </button>
-              </div>
-
-              {errorMsg && (
-                <div className="border-2 border-black bg-black text-white text-[10px] font-bold uppercase px-3 py-2">
-                  ⚠ {errorMsg}
-                </div>
-              )}
-
-              <div className="flex flex-col gap-1">
-                <label className="text-[9px] font-bold uppercase tracking-widest">PRODUCT NAME</label>
-                <input
-                  type="text" required value={editName} onChange={(e) => setEditName(e.target.value)}
-                  style={{ fontSize: '16px' }} className="w-full bg-white border-2 border-black px-3 py-2 text-xs focus:outline-none"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-[9px] font-bold uppercase tracking-widest">DESCRIPTION</label>
-                <textarea
-                  required value={editDesc} onChange={(e) => setEditDesc(e.target.value)}
-                  rows={3} style={{ fontSize: '16px' }} className="w-full bg-white border-2 border-black px-3 py-2 text-xs focus:outline-none resize-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-bold uppercase tracking-widest">MRP (INR)</label>
-                  <input
-                    type="number" required value={editMrp} onChange={(e) => setEditMrp(e.target.value)}
-                    style={{ fontSize: '16px' }} className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs focus:outline-none"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-bold uppercase tracking-widest">SELLING PRICE</label>
-                  <input
-                    type="number" required value={editSellingPrice} onChange={(e) => setEditSellingPrice(e.target.value)}
-                    style={{ fontSize: '16px' }} className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-bold uppercase tracking-widest">STOCK COUNT</label>
-                  <input
-                    type="number" required value={editStock} onChange={(e) => setEditStock(e.target.value)}
-                    style={{ fontSize: '16px' }} className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs focus:outline-none"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-bold uppercase tracking-widest">DELIVERY DAYS</label>
-                  <input
-                    type="number" required value={editDeliveryDays} onChange={(e) => setEditDeliveryDays(e.target.value)}
-                    style={{ fontSize: '16px' }} className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-bold uppercase tracking-widest">SKU</label>
-                  <input
-                    type="text" value={editSku} onChange={(e) => setEditSku(e.target.value)}
-                    style={{ fontSize: '16px' }} className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs focus:outline-none"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-bold uppercase tracking-widest">SEARCH TAGS (COMMA SEPARATED)</label>
-                  <input
-                    type="text" value={editTagsInput} onChange={(e) => setEditTagsInput(e.target.value)}
-                    style={{ fontSize: '16px' }} className="w-full bg-white border-2 border-black px-3 py-1.5 text-xs focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Specification key-value fields list */}
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[9px] font-bold uppercase tracking-widest">SPECIFICATIONS</label>
-                  <button type="button" onClick={addFeatureRow} className="border border-black px-2 py-0.5 font-bold text-[8px] hover:bg-black hover:text-white transition-colors">
-                    + ADD ROW
-                  </button>
-                </div>
-                <div className="space-y-1.5">
-                  {editFeatures.map((feat, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <input
-                        type="text" placeholder="KEY" value={feat.key} onChange={(e) => updateFeatureRow(idx, 'key', e.target.value)}
-                        className="flex-1 bg-white border-2 border-black px-2 py-1 text-xs focus:outline-none"
-                      />
-                      <input
-                        type="text" placeholder="VALUE" value={feat.value} onChange={(e) => updateFeatureRow(idx, 'value', e.target.value)}
-                        className="flex-1 bg-white border-2 border-black px-2 py-1 text-xs focus:outline-none"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Replace images */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[9px] font-bold uppercase tracking-widest">REPLACE IMAGES (OPTIONAL)</label>
-                <div className="relative border-2 border-dashed border-black bg-white p-4 flex flex-col items-center justify-center text-center">
-                  <input
-                    type="file" multiple accept="image/*" onChange={(e) => setEditImageFiles(Array.from(e.target.files))}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <Upload size={16} className="text-neutral-400 mb-1" />
-                  {editImageFiles.length > 0 ? (
-                    <span className="text-[10px] font-bold text-black uppercase">{editImageFiles.length} FILES SELECTED</span>
-                  ) : (
-                    <span className="text-[10px] text-neutral-400 uppercase">SELECT IMAGES TO OVERWRITE</span>
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="submit" disabled={submitting}
-                className="w-full bg-black text-white font-space font-bold uppercase text-xs py-4 border-2 border-black hover:bg-white hover:text-black transition-colors touch-manipulation mt-2"
-              >
-                {submitting ? 'UPLOADING AND SAVING...' : 'SAVE CHANGES'}
-              </button>
-            </form>
-          ) : (
-            /* ── REGULAR USER DETAILS VIEW ── */
-            <>
-              {/* Name */}
-              <h1 className="font-inter font-black text-3xl sm:text-4xl md:text-5xl xl:text-6xl uppercase tracking-tighter leading-none mb-3">
-                {product.name}
-              </h1>
-
-              {/* Rating */}
-              <div className="flex flex-wrap items-center gap-2 md:gap-3 font-space text-[9px] md:text-xs text-neutral-500 uppercase tracking-wider mb-5">
-                <span>{'█'.repeat(Math.round(product.rating || 5))}{'░'.repeat(5 - Math.round(product.rating || 5))}</span>
-                <span>{product.rating || '5.0'} / 5.0</span>
-                {isAdmin && (
-                  <>
-                    <span className="hidden sm:inline">·</span>
-                    <span className="hidden sm:inline">{product.salesCount || 0} SOLD</span>
-                  </>
-                )}
-              </div>
-
-              {/* Price block */}
-              <div className="border-2 border-black p-4 md:p-5 mb-5 bg-white shadow-solid-sm">
-                <div className="font-space font-black text-3xl md:text-5xl text-black tracking-tight">
-                  ₹{product.sellingPrice.toLocaleString('en-IN')}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 md:gap-3 mt-1">
-                  {saving > 0 && (
-                    <>
-                      <span className="font-space text-xs text-neutral-500 line-through">
-                        MRP ₹{product.mrp.toLocaleString('en-IN')}
-                      </span>
-                      <span className="font-space text-[9px] md:text-xs font-bold bg-black text-white px-2 py-0.5">
-                        SAVE ₹{saving.toLocaleString('en-IN')}
-                      </span>
-                    </>
-                  )}
-                </div>
-                <p className="font-space text-[9px] md:text-xs text-neutral-500 mt-2 uppercase tracking-wider">
-                  Incl. taxes · Free shipping · {product.deliveryDays || 5} days
-                </p>
-              </div>
-
-              {/* Quantity Selector */}
-              <div className="flex items-center gap-4 mb-5">
-                <span className="font-space text-[10px] md:text-xs font-bold uppercase tracking-widest">QTY:</span>
-                <div className="flex items-center border-2 border-black bg-white">
-                  <button
-                    onClick={() => setQty(Math.max(1, qty - 1))}
-                    className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center border-r-2 border-black hover:bg-black hover:text-white transition-colors duration-75 touch-manipulation"
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <span className="w-10 md:w-12 text-center font-space font-bold text-sm">{qty}</span>
-                  <button
-                    onClick={() => setQty(Math.min(product.stock || 99, qty + 1))}
-                    className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center border-l-2 border-black hover:bg-black hover:text-white transition-colors duration-75 touch-manipulation"
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Desktop CTA */}
-              <motion.button
-                onClick={handleAddToCart}
-                disabled={product.stock === 0}
-                whileTap={{ scale: 0.98 }}
-                transition={spring}
-                className={`hidden md:flex w-full items-center justify-center gap-3 font-space font-black uppercase text-sm py-5 border-4 border-black shadow-solid transition-colors duration-75 mb-6 ${
-                  product.stock === 0
-                    ? 'bg-neutral-100 text-neutral-400 border-neutral-300 cursor-not-allowed shadow-none'
-                    : added
-                      ? 'bg-black text-white'
-                      : 'bg-black text-white hover:bg-white hover:text-black'
-                }`}
-              >
-                <ShoppingBag size={18} />
-                {product.stock === 0 ? 'SOLD OUT' : added ? '✓ ADDED' : 'ADD TO INVENTORY'}
-              </motion.button>
-
-              {/* Description */}
-              <p className="font-space text-xs md:text-sm text-neutral-600 leading-relaxed mb-6">
-                {product.description}
-              </p>
-
-              {/* Accordion sections */}
-              <div className="border-b-2 border-black bg-white">
-                {product.features && product.features.length > 0 && (
-                  <AccordionSection title="SPECS & DIMENSIONS">
-                    <table className="w-full font-space text-xs">
-                      <tbody>
-                        {product.features.map((f) => (
-                          <tr key={f.key} className="border-t border-neutral-200">
-                            <td className="py-2 pr-3 text-neutral-500 uppercase tracking-wider w-2/5">{f.key}</td>
-                            <td className="py-2 font-bold uppercase text-right md:text-left">{f.value}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </AccordionSection>
-                )}
-
-                <AccordionSection title="SHIPPING & HANDLING">
-                  <div className="font-space text-xs text-neutral-600 leading-relaxed space-y-1.5">
-                    <p>FREE STANDARD SHIPPING ON ALL ORDERS.</p>
-                    <p>DELIVERY: {product.deliveryDays || 5}–{Number(product.deliveryDays || 5) + 2} BUSINESS DAYS.</p>
-                    <p>SHIPS IN RIGID FLAT MAILERS. NO TUBES.</p>
-                    <p>TRACKING VIA EMAIL POST-DISPATCH.</p>
-                  </div>
-                </AccordionSection>
-
-                <AccordionSection title="MATERIALS & QUALITY">
-                  <div className="font-space text-xs text-neutral-600 leading-relaxed space-y-1.5">
-                    <p>300 GSM ARCHIVAL MATTE PAPER — ACID-FREE.</p>
-                    <p>PIGMENT INKJET MONOCHROME. ZERO COLOR LEAKAGE.</p>
-                    <p>SOLID WOOD FRAME — BLACK LACQUER. 20MM PROFILE.</p>
-                    <p>3MM GALLERY-GRADE GLASS. ANTI-GLARE. UV-PROTECTED.</p>
-                  </div>
-                </AccordionSection>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile Sticky CTA (Hidden in Edit Mode) */}
-      {!editOpen && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden border-t-4 border-black bg-white px-4 py-3 flex items-center gap-3 shadow-[0_-4px_0_0_#000]">
-          <div className="flex-1 min-w-0">
-            <div className="font-space font-black text-lg leading-none">₹{product.sellingPrice.toLocaleString('en-IN')}</div>
-            <div className="font-space text-[9px] text-neutral-500 uppercase tracking-wider">INCL. ALL TAXES</div>
-          </div>
-          <div className="flex items-center border-2 border-black shrink-0 bg-white">
-            <button onClick={() => setQty(Math.max(1, qty - 1))} className="w-10 h-10 flex items-center justify-center border-r-2 border-black hover:bg-black hover:text-white touch-manipulation">
-              <Minus size={12} />
-            </button>
-            <span className="w-8 text-center font-space font-bold text-xs">{qty}</span>
-            <button onClick={() => setQty(Math.min(product.stock || 99, qty + 1))} className="w-10 h-10 flex items-center justify-center border-l-2 border-black hover:bg-black hover:text-white touch-manipulation">
-              <Plus size={12} />
-            </button>
-          </div>
-          <motion.button
-            onClick={handleAddToCart}
-            disabled={product.stock === 0}
-            whileTap={{ scale: 0.97 }}
-            transition={spring}
-            className={`flex items-center gap-2 font-space font-black uppercase text-xs px-5 py-3 border-2 border-black shrink-0 transition-colors duration-75 touch-manipulation ${
-              product.stock === 0
-                ? 'bg-neutral-100 text-neutral-400 border-neutral-300 cursor-not-allowed'
-                : added
-                  ? 'bg-white text-black'
-                  : 'bg-black text-white'
-            }`}
-          >
-            <ShoppingBag size={14} />
-            {product.stock === 0 ? 'OUT' : added ? '✓ ADDED' : 'ADD'}
-          </motion.button>
-        </div>
-      )}
-
+      {/* Delete Popup Notification */}
       <Popup
         isOpen={deletePopupOpen}
         title="DELETE PRODUCT"

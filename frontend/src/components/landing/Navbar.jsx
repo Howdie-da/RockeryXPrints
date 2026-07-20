@@ -9,16 +9,17 @@ import { logout } from '../../store/authSlice';
 const spring = { type: 'spring', stiffness: 300, damping: 25 };
 
 const NAV_LINKS = [
-  { name: 'HOME',        href: '/' },
-  { name: 'COLLECTIONS', href: '/categories' },
-  { name: 'SHOP',        href: '/shop' },
+  { name: 'HOME', href: '/' },
+  { name: 'COLLECTIONS', href: '/collections'},
+  { name: 'CATEGORIES', href: '/categories' },
+  { name: 'SHOP', href: '/shop' },
 ];
 
 export default function Navbar() {
-  const [isOpen,    setIsOpen]    = useState(false);
-  const [scrolled,  setScrolled]  = useState(false);
-  const dispatch   = useDispatch();
-  const navigate   = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { pathname } = useLocation();
   const { isAuthenticated } = useSelector((s) => s.auth);
   const cartSize = useSelector((s) => s.cart.size);
@@ -43,11 +44,10 @@ export default function Navbar() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 h-20 z-50 select-none transition-[border-bottom-width,box-shadow,background-color] duration-200 ${
-        scrolled
+      className={`fixed top-0 left-0 right-0 h-20 z-50 select-none transition-[border-bottom-width,box-shadow,background-color] duration-200 ${scrolled
           ? 'border-b-2 border-black bg-white/80 backdrop-blur-md shadow-[0_3px_0_0_#000]'
           : 'border-b-2 border-black bg-white'
-      }`}
+        }`}
     >
       <div className="max-w-7xl mx-auto h-full px-6 md:px-12 flex items-center justify-between">
 
@@ -185,8 +185,7 @@ export default function Navbar() {
                     end={link.href === '/'}
                     onClick={() => setIsOpen(false)}
                     className={({ isActive }) =>
-                      `block px-6 py-4 transition-colors duration-75 ${
-                        isActive ? 'bg-black text-white' : 'hover:bg-black hover:text-white'
+                      `block px-6 py-4 transition-colors duration-75 ${isActive ? 'bg-black text-white' : 'hover:bg-black hover:text-white'
                       }`
                     }
                   >

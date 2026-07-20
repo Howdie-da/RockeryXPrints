@@ -15,6 +15,7 @@ import CartPage from './pages/CartPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import CategoriesPage from './pages/CategoriesPage.jsx'
+import CollectionsPage from './pages/CollectionsPage.jsx'
 import ShopPage from './pages/ShopPage.jsx'
 import CategoryDetailPage from './pages/CategoryDetailPage.jsx'
 
@@ -38,6 +39,10 @@ const router = createBrowserRouter([
   {
     path: '/dashboard',
     element: <DashboardPage />,
+  },
+  {
+    path: '/collections',
+    element: <CollectionsPage />,
   },
   {
     path: '/categories',

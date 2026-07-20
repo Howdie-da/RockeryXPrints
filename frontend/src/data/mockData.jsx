@@ -343,6 +343,63 @@ export const mockCategories = [
   },
 ];
 
+export const mockCollections = [
+  {
+    _id: 'col_001',
+    name: 'ANIME OBSESSION',
+    slug: 'anime',
+    searchTag: 'anime',
+    coverImage: '',
+    productCount: 12,
+    description: 'Raw monochrome inks & iconic characters from dark anime realms.',
+  },
+  {
+    _id: 'col_002',
+    name: 'CYBERPUNK NEON-FREE',
+    slug: 'cyberpunk',
+    searchTag: 'cyberpunk',
+    coverImage: '',
+    productCount: 8,
+    description: 'Surveillance eyes, biomechanical skulls & machine ghosts.',
+  },
+  {
+    _id: 'col_003',
+    name: 'GAMING TITANS',
+    slug: 'gaming',
+    searchTag: 'gaming',
+    coverImage: '',
+    productCount: 15,
+    description: 'Geometric runes and colossal legends forged in black & white.',
+  },
+  {
+    _id: 'col_004',
+    name: 'SCI-FI DEEP VOID',
+    slug: 'sci-fi',
+    searchTag: 'sci-fi',
+    coverImage: '',
+    productCount: 10,
+    description: 'Deep space exploration, orbital geometry & celestial void.',
+  },
+  {
+    _id: 'col_005',
+    name: 'COMICS MONOCHROME',
+    slug: 'comics',
+    searchTag: 'comics',
+    coverImage: '',
+    productCount: 7,
+    description: 'Stark graphic novel silhouettes and heavy ink shadows.',
+  },
+  {
+    _id: 'col_006',
+    name: 'HORROR SILHOUETTES',
+    slug: 'horror',
+    searchTag: 'horror',
+    coverImage: '',
+    productCount: 6,
+    description: 'Terror behind the mask, eerie geometries & visceral darkness.',
+  },
+];
+
 // Helper to return consistent vector SVG for product designs based on slug or index
 export const getProductSvg = (slug, index = 0) => {
   const mapping = {

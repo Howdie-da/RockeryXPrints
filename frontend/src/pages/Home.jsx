@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Navbar from '../components/landing/Navbar';
 import Hero from '../components/landing/Hero';
-import FandomMarquee from '../components/landing/FandomMarquee';
+import CollectionsShowcase from '../components/landing/CollectionsShowcase';
 import FeaturedProducts from '../components/landing/FeaturedProducts';
 import BentoAbout from '../components/landing/BentoAbout';
 import Footer from '../components/landing/Footer';
@@ -21,7 +21,6 @@ function shuffle(array) {
 
 export default function Home() {
   const [products, setProducts] = useState([]);
-  const [searchTags, setSearchTags] = useState([]);
 
   useEffect(() => {
     getProducts()
@@ -30,23 +29,7 @@ export default function Home() {
         const fetchedProducts = Array.isArray(data) ? data : [];
         
         if (fetchedProducts.length > 0) {
-          // Compile unique tags strictly from backend data
-          const tags = new Set();
-          fetchedProducts.forEach(p => {
-            if (Array.isArray(p.searchTags)) {
-              p.searchTags.forEach(t => {
-                if (t && t.trim() !== '') {
-                  tags.add(t.trim().toUpperCase());
-                }
-              });
-            }
-          });
-          setSearchTags(Array.from(tags).sort());
-
-          // Randomize fetched products and assign to 7 slots
           let randomized = shuffle(fetchedProducts);
-          
-          // Pad with mock products if we have fewer than 7 items
           if (randomized.length < 7) {
             const shuffledMocks = shuffle(mockProducts);
             shuffledMocks.forEach(mp => {
@@ -55,42 +38,15 @@ export default function Home() {
               }
             });
           }
-          
           setProducts(randomized.slice(0, 7));
         } else {
-          // Fallback if backend returned no products
           const shuffled = shuffle(mockProducts);
           setProducts(shuffled.slice(0, 7));
-
-          const tags = new Set();
-          mockProducts.forEach(p => {
-            if (Array.isArray(p.searchTags)) {
-              p.searchTags.forEach(t => {
-                if (t && t.trim() !== '') {
-                  tags.add(t.trim().toUpperCase());
-                }
-              });
-            }
-          });
-          setSearchTags(Array.from(tags).sort());
         }
       })
       .catch(() => {
-        // Fallback entirely to mock products on error
         const shuffled = shuffle(mockProducts);
         setProducts(shuffled.slice(0, 7));
-
-        const tags = new Set();
-        mockProducts.forEach(p => {
-          if (Array.isArray(p.searchTags)) {
-            p.searchTags.forEach(t => {
-              if (t && t.trim() !== '') {
-                tags.add(t.trim().toUpperCase());
-              }
-            });
-          }
-        });
-        setSearchTags(Array.from(tags).sort());
       });
   }, []);
 
@@ -102,8 +58,8 @@ export default function Home() {
     <div id="home" className="min-h-screen bg-white text-black font-space selection:bg-black selection:text-white overflow-x-hidden antialiased">
       <Navbar />
       <main className="pt-20">
+        <CollectionsShowcase />
         <Hero products={heroProducts} />
-        <FandomMarquee tags={searchTags} />
         <FeaturedProducts products={featuredProducts} />
         <BentoAbout />
       </main>
