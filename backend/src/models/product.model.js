@@ -81,7 +81,18 @@ const productSchema = new mongoose.Schema({
     rating: {
         type: Number,
         min: 0,
-        max: 5
+        max: 5,
+        default: 0
+    },
+
+    totalRatings: {
+        type: Number,
+        default: 0
+    },
+
+    isPurchased: {
+        type: Boolean,
+        default: false
     },
 
     salesCount: {

@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { addToCart as addToCartSlice } from '../store/cartSlice';
 import { getProductSvg, mockProducts } from '../data/mockData';
-import { getProductBySlug, updateProductAPI, deleteProductAPI, getProducts } from '../services/api';
+import { getProductBySlug, updateProductAPI, deleteProductAPI, getProducts, addOrUpdateReviewAPI, getProductReviewsAPI, deleteReviewAPI } from '../services/api';
 import Navbar from '../components/landing/Navbar';
 import Footer from '../components/landing/Footer';
 import Popup from '../components/landing/Popup';
@@ -84,6 +84,15 @@ export default function ProductDetailPage() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // Reviews state
+  const [reviews, setReviews] = useState([]);
+  const [ratingBreakdown, setRatingBreakdown] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
+  const [userRating, setUserRating] = useState(5);
+  const [userMessage, setUserMessage] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewErrorMsg, setReviewErrorMsg] = useState('');
+  const [reviewSuccessMsg, setReviewSuccessMsg] = useState('');
+
   // Edit form states
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState('');
@@ -99,6 +108,21 @@ export default function ProductDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deletePopupOpen, setDeletePopupOpen] = useState(false);
 
+  const fetchReviews = (productId) => {
+    if (!productId) return;
+    getProductReviewsAPI(productId)
+      .then((res) => {
+        const data = res.data?.data;
+        if (data) {
+          setReviews(data.reviews || []);
+          if (data.ratingBreakdown) {
+            setRatingBreakdown(data.ratingBreakdown);
+          }
+        }
+      })
+      .catch(() => { });
+  };
+
   const fetchProductDetails = () => {
     setLoading(true);
     setErrorMsg('');
@@ -109,6 +133,13 @@ export default function ProductDetailPage() {
           setProduct(data);
           setActiveThumb(0);
           setQty(1);
+
+          if (data.userReview) {
+            setUserRating(data.userReview.rating || 5);
+            setUserMessage(data.userReview.message || '');
+          }
+
+          fetchReviews(data._id);
 
           // Initialize edit states
           setEditName(data.name || '');
@@ -185,6 +216,48 @@ export default function ProductDetailPage() {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     }
+  };
+
+  const handleSubmitReview = (e) => {
+    e.preventDefault();
+    if (!product) return;
+    if (!userRating) {
+      setReviewErrorMsg('RATING IS MANDATORY');
+      return;
+    }
+    if (!userMessage.trim()) {
+      setReviewErrorMsg('ENTER A REVIEW MESSAGE');
+      return;
+    }
+
+    setSubmittingReview(true);
+    setReviewErrorMsg('');
+    setReviewSuccessMsg('');
+
+    addOrUpdateReviewAPI(product._id, { rating: userRating, message: userMessage })
+      .then(() => {
+        setReviewSuccessMsg('YOUR REVIEW HAS BEEN SUBMITTED!');
+        fetchProductDetails();
+        fetchReviews(product._id);
+      })
+      .catch((err) => {
+        setReviewErrorMsg(err.response?.data?.message || 'FAILED TO SUBMIT REVIEW.');
+      })
+      .finally(() => setSubmittingReview(false));
+  };
+
+  const handleDeleteReview = (reviewId) => {
+    if (!window.confirm('DELETE THIS REVIEW?')) return;
+    deleteReviewAPI(reviewId)
+      .then(() => {
+        setUserMessage('');
+        setUserRating(5);
+        fetchProductDetails();
+        fetchReviews(product._id);
+      })
+      .catch((err) => {
+        alert(err.response?.data?.message || 'FAILED TO DELETE REVIEW');
+      });
   };
 
   // Submit Edit API
@@ -547,15 +620,19 @@ export default function ProductDetailPage() {
                     {product.name}
                   </h1>
 
-                  {/* Rating + Sold Count */}
+                  {/* Rating + Total Rating Line + Sold Count */}
                   <div className="flex flex-wrap items-center gap-3 font-space text-xs text-neutral-500 uppercase tracking-wider mb-6">
-                    <div className="flex items-center gap-1 text-black font-bold">
-                      <span>★ {product.rating || '5.0'}</span>
+                    <div className="flex items-center gap-1.5 text-black font-bold">
+                      <span className="text-amber-500">★</span>
+                      <span>{product.rating ? Number(product.rating).toFixed(1) : '5.0'}</span>
+                      <span className="text-neutral-400 font-normal">
+                        ({product.totalRatings || reviews.length || 0} total ratings)
+                      </span>
                     </div>
                     {isAdmin && (
                       <>
                         <span>·</span>
-                        <span className="font-bold text-black">{product.salesCount || 0} UNITS DISPATCHED</span>
+                        <span className="font-bold text-black">{product.salesCount || 0} UNITS SOLD</span>
                       </>
                     )}
                   </div>
@@ -748,6 +825,230 @@ export default function ProductDetailPage() {
             </div>
           </section>
         )}
+
+        {/* ── CUSTOMER REVIEWS & RATINGS BLOCK ── */}
+        <section className="bg-neutral-50 border-b-4 border-black py-16 px-6 md:px-12 select-none">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 pb-4 border-b-2 border-black">
+              <div>
+                <h3 className="font-inter font-black text-3xl md:text-4xl uppercase tracking-tighter">
+                  REVIEWS & RATINGS
+                </h3>
+              </div>
+              <div className="font-space text-xs font-bold uppercase border-2 border-black px-4 py-2 bg-white text-black shadow-solid-sm self-start sm:self-auto">
+                {product?.totalRatings || reviews.length || 0} TOTAL RATINGS
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+              {/* Left Column: Summary & Rating Breakdown */}
+              <div className="lg:col-span-5 flex flex-col gap-6">
+                <div className="border-4 border-black p-6 bg-white shadow-solid">
+                  <div className="flex items-baseline gap-4 mb-2">
+                    <span className="font-space font-black text-6xl text-black">
+                      {product?.rating ? Number(product.rating).toFixed(1) : '5.0'}
+                    </span>
+                    <div className="flex flex-col">
+                      <div className="flex items-center text-amber-500 text-lg">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <span key={star}>
+                            {star <= Math.round(product?.rating || 5) ? '★' : '☆'}
+                          </span>
+                        ))}
+                      </div>
+                      <span className="font-space text-xs font-bold text-neutral-500 uppercase mt-0.5">
+                        OUT OF 5 STARS
+                      </span>
+                    </div>
+                  </div>
+                  <p className="font-space text-xs text-neutral-600 uppercase tracking-wider">
+                    BASED ON {product?.totalRatings || reviews.length || 0} USER RATINGS
+                  </p>
+                </div>
+
+                {/* Rating Breakdown Bars */}
+                <div className="border-4 border-black p-6 bg-white shadow-solid font-space">
+                  <h4 className="font-bold text-xs uppercase tracking-widest text-black mb-4">
+                    RATING DISTRIBUTION
+                  </h4>
+                  <div className="space-y-3">
+                    {[5, 4, 3, 2, 1].map((stars) => {
+                      const count = ratingBreakdown[stars] || 0;
+                      const total = reviews.length || 1;
+                      const percent = Math.round((count / total) * 100);
+                      return (
+                        <div key={stars} className="flex items-center gap-3 text-xs">
+                          <span className="w-10 font-bold">{stars} ★</span>
+                          <div className="flex-1 bg-neutral-100 border-2 border-black h-3.5 overflow-hidden">
+                            <div
+                              className="bg-black h-full transition-all duration-300"
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
+                          <span className="w-8 text-right text-neutral-500 font-bold">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Write/Edit Review Form + Reviews List */}
+              <div className="lg:col-span-7 flex flex-col gap-8">
+                {/* Review Form */}
+                <div className="border-4 border-black p-6 md:p-8 bg-white shadow-solid font-space">
+                  <h4 className="font-inter font-black text-xl uppercase tracking-tight mb-2 text-black">
+                    {product?.userReview ? 'EDIT YOUR REVIEW' : 'WRITE A REVIEW'}
+                  </h4>
+
+                  {product?.isPurchased ? (
+                    <form onSubmit={handleSubmitReview} className="space-y-4 mt-4">
+                      {reviewErrorMsg && (
+                        <div className="border-2 border-black bg-black text-white text-xs font-bold uppercase p-3">
+                          ⚠ {reviewErrorMsg}
+                        </div>
+                      )}
+                      {reviewSuccessMsg && (
+                        <div className="border-2 border-black bg-emerald-600 text-white text-xs font-bold uppercase p-3">
+                          ✓ {reviewSuccessMsg}
+                        </div>
+                      )}
+
+                      {/* Interactive Star Picker (Mandatory Rating) */}
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 block mb-1.5">
+                          RATING
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setUserRating(star)}
+                              className={`w-10 h-10 border-2 border-black font-bold text-lg flex items-center justify-center transition-colors cursor-pointer ${star <= userRating ? 'bg-black text-amber-400' : 'bg-white text-neutral-300 hover:bg-neutral-100'
+                                }`}
+                            >
+                              ★
+                            </button>
+                          ))}
+                          <span className="text-xs font-bold uppercase tracking-wider ml-2 text-black">
+                            {userRating} / 5 STARS
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Review Message */}
+                      <div>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-neutral-500 block mb-1.5">
+                          YOUR REVIEW / MESSAGE *
+                        </label>
+                        <textarea
+                          required
+                          rows={3}
+                          value={userMessage}
+                          onChange={(e) => setUserMessage(e.target.value)}
+                          placeholder="SHARE YOUR THOUGHTS ON THE PRINT QUALITY, PACKAGING, OR DESIGN..."
+                          className="w-full bg-white border-2 border-black p-3 font-space text-xs focus:outline-none uppercase"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={submittingReview}
+                        className="w-full bg-black text-white hover:bg-white hover:text-black font-space font-bold uppercase text-xs tracking-wider py-4 border-2 border-black transition-colors cursor-pointer shadow-solid-sm disabled:opacity-50"
+                      >
+                        {submittingReview ? 'SUBMITTING...' : product?.userReview ? 'UPDATE REVIEW' : 'PUBLISH REVIEW'}
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="border-2 border-dashed border-black p-6 bg-neutral-100 text-center font-space mt-4">
+                      <p className="font-bold text-xs uppercase tracking-wider text-black mb-1">
+                        VERIFIED USERS ONLY
+                      </p>
+                      <p className="text-[11px] text-neutral-500 uppercase tracking-widest">
+                        ONLY CUSTOMERS WHO HAVE PURCHASED THIS PRINT CAN LEAVE A RATING AND REVIEW.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Reviews List */}
+                <div className="space-y-4">
+                  <h4 className="font-inter font-black text-xl uppercase tracking-tight text-black">
+                    CUSTOMER REVIEWS ({reviews.length})
+                  </h4>
+
+                  {reviews.length === 0 ? (
+                    <div className="border-2 border-black p-8 bg-white text-center font-space">
+                      <p className="text-xs text-neutral-500 uppercase tracking-widest">
+                        NO REVIEWS YET FOR THIS PRINT. BE THE FIRST VERIFIED USER TO REVIEW!
+                      </p>
+                    </div>
+                  ) : (
+                    reviews.map((rev) => {
+                      const userName = rev.user?.fullName || rev.user?.name || (rev.user?.email ? rev.user.email.split('@')[0] : 'VERIFIED PURCHASE');
+                      const userAvatar = rev.user?.avatar;
+                      const userInitials = userName !== 'VERIFIED PURCHASER'
+                        ? userName.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                        : 'VP';
+
+                      return (
+                        <div key={rev._id} className="border-2 border-black p-6 bg-white font-space space-y-3 shadow-solid-sm">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {userAvatar ? (
+                                <img
+                                  src={userAvatar}
+                                  alt={userName}
+                                  className="w-10 h-10 border-2 border-black object-cover shrink-0"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 border-2 border-black bg-black text-white font-bold text-xs flex items-center justify-center uppercase shrink-0">
+                                  {userInitials}
+                                </div>
+                              )}
+                              <div>
+                                <span className="font-bold text-xs uppercase block text-black">
+                                  {userName}
+                                </span>
+                                <span className="text-[9px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-500 px-1.5 py-0.5 uppercase inline-block mt-0.5">
+                                  ✓ VERIFIED PURCHASE
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <div className="text-amber-500 font-bold text-sm">
+                                {'★'.repeat(rev.rating)}{'☆'.repeat(5 - rev.rating)}
+                              </div>
+                              {(user?._id === rev.user?._id || isAdmin) && (
+                                <button
+                                  onClick={() => handleDeleteReview(rev._id)}
+                                  className="text-neutral-400 hover:text-red-600 transition-colors p-1 cursor-pointer"
+                                  title="DELETE REVIEW"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-neutral-700 leading-relaxed uppercase pt-1">
+                            "{rev.message}"
+                          </p>
+
+                          <div className="text-[9px] text-neutral-400 uppercase tracking-widest text-right">
+                            {new Date(rev.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       {/* Footer Component */}

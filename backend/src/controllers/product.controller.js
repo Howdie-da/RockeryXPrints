@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import { Category } from "../models/category.model.js";
 import { Collection } from "../models/collection.model.js";
 import { Product } from "../models/product.model.js";
+import { Review } from "../models/reviews.model.js";
+import { Order } from "../models/order.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -85,6 +87,48 @@ const deleteCategory = asyncHandler(async (req, res) => {
     return res
     .status(200)
     .json(new ApiResponse(200, {}, "Category deleted successfully"))
+})
+
+const updateCategory = asyncHandler(async (req, res) => {
+    const { categoryId } = req.params;
+    const { name } = req.body;
+
+    if (!categoryId) {
+        throw new ApiError(400, "Category ID is required.");
+    }
+
+    const existingCategory = await Category.findById(categoryId);
+    if (!existingCategory) {
+        throw new ApiError(404, "Category not found.");
+    }
+
+    if (name && name.trim() !== existingCategory.name) {
+        const slug = name.toLowerCase().trim().replaceAll(' ', '-');
+        const duplicate = await Category.findOne({ slug, _id: { $ne: categoryId } });
+        if (duplicate) {
+            throw new ApiError(400, "Another category with this name already exists.");
+        }
+        existingCategory.name = name.trim();
+        existingCategory.slug = slug;
+    }
+
+    const coverImagePath = req.files?.coverImage?.[0]?.path;
+    if (coverImagePath) {
+        if (existingCategory.coverImage) {
+            await deleteOnCloudinary(existingCategory.coverImage);
+        }
+        const newCoverImage = await uploadOnCloudinary(coverImagePath);
+        if (!newCoverImage) {
+            throw new ApiError(500, "Error uploading new cover photo");
+        }
+        existingCategory.coverImage = newCoverImage.url;
+    }
+
+    await existingCategory.save();
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200, existingCategory, "Category updated successfully"));
 })
 
 const addProduct = asyncHandler(async (req, res) => {
@@ -385,9 +429,30 @@ const getProductBySlug = asyncHandler(async (req, res) => {
     const variants = await Product.find({ parentProduct: product._id })
         .select("name sku sellingPrice mrp stock images");
 
+    let isPurchased = product.isPurchased || false;
+    let userReview = null;
+
+    if (req.user) {
+        const orderExists = await Order.exists({
+            user: req.user._id,
+            "orderItems.product": product._id
+        });
+        isPurchased = !!orderExists || req.user.role === 'admin' || product.isPurchased;
+
+        userReview = await Review.findOne({
+            product: product._id,
+            user: req.user._id
+        });
+    }
+
+    const totalRatings = await Review.countDocuments({ product: product._id });
+
     const productData = {
         ...product.toObject(),
-        variants
+        variants,
+        isPurchased,
+        userReview,
+        totalRatings: totalRatings || product.totalRatings || 0
     };
 
     return res
@@ -533,9 +598,135 @@ const updateCollection = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, existingCollection, "Collection updated successfully"));
 })
 
+const addOrUpdateReview = asyncHandler(async (req, res) => {
+    const { productId } = req.params;
+    const { rating, message } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+        throw new ApiError(400, "Rating is mandatory and must be between 1 and 5 stars.");
+    }
+
+    if (!message || !message.trim()) {
+        throw new ApiError(400, "Review message is required.");
+    }
+
+    const product = await Product.findById(productId);
+    if (!product) {
+        throw new ApiError(404, "Product not found.");
+    }
+
+    const orderExists = await Order.exists({
+        user: req.user._id,
+        "orderItems.product": productId
+    });
+
+    const isPurchased = !!orderExists || req.user.role === 'admin' || product.isPurchased;
+    if (!isPurchased) {
+        throw new ApiError(403, "Only users who have purchased this product can submit a review.");
+    }
+
+    const review = await Review.findOneAndUpdate(
+        { product: productId, user: req.user._id },
+        {
+            rating: Number(rating),
+            message: message.trim(),
+            isVerifiedPurchase: true
+        },
+        { upsert: true, returnDocument: 'after', runValidators: true }
+    );
+
+    await review.populate("user", "fullName name avatar email role");
+
+    const stats = await Review.aggregate([
+        { $match: { product: new mongoose.Types.ObjectId(productId) } },
+        {
+            $group: {
+                _id: "$product",
+                avgRating: { $avg: "$rating" },
+                totalRatings: { $sum: 1 }
+            }
+        }
+    ]);
+
+    const avgRating = stats.length > 0 ? Math.round(stats[0].avgRating * 10) / 10 : Number(rating);
+    const totalRatings = stats.length > 0 ? stats[0].totalRatings : 1;
+
+    product.rating = avgRating;
+    product.totalRatings = totalRatings;
+    await product.save();
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, { review, rating: avgRating, totalRatings }, "Review submitted successfully"));
+});
+
+const getProductReviews = asyncHandler(async (req, res) => {
+    const { productId } = req.params;
+
+    const reviews = await Review.find({ product: productId })
+        .populate("user", "fullName name avatar email role")
+        .sort({ createdAt: -1 });
+
+    const stats = await Review.aggregate([
+        { $match: { product: new mongoose.Types.ObjectId(productId) } },
+        {
+            $group: {
+                _id: "$rating",
+                count: { $sum: 1 }
+            }
+        }
+    ]);
+
+    const ratingBreakdown = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    stats.forEach(item => {
+        ratingBreakdown[item._id] = item.count;
+    });
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, { reviews, ratingBreakdown, totalRatings: reviews.length }, "Reviews fetched successfully"));
+});
+
+const deleteReview = asyncHandler(async (req, res) => {
+    const { reviewId } = req.params;
+
+    const review = await Review.findById(reviewId);
+    if (!review) {
+        throw new ApiError(404, "Review not found.");
+    }
+
+    if (review.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        throw new ApiError(403, "You are not authorized to delete this review.");
+    }
+
+    const productId = review.product;
+    await review.deleteOne();
+
+    const stats = await Review.aggregate([
+        { $match: { product: new mongoose.Types.ObjectId(productId) } },
+        {
+            $group: {
+                _id: "$product",
+                avgRating: { $avg: "$rating" },
+                totalRatings: { $sum: 1 }
+            }
+        }
+    ]);
+
+    const avgRating = stats.length > 0 ? Math.round(stats[0].avgRating * 10) / 10 : 0;
+    const totalRatings = stats.length > 0 ? stats[0].totalRatings : 0;
+
+    await Product.findByIdAndUpdate(productId, { rating: avgRating, totalRatings });
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, {}, "Review deleted successfully"));
+});
+
 export {
     addCategory,
     getCategories,
+    updateCategory,
     deleteCategory,
     addCollection,
     getCollections,
@@ -545,5 +736,8 @@ export {
     updateProduct,
     deleteProduct,
     getProducts,
-    getProductBySlug
+    getProductBySlug,
+    addOrUpdateReview,
+    getProductReviews,
+    deleteReview
 }

@@ -1,15 +1,18 @@
 import { Router } from "express";
-import { jwtVerifier } from "../middleware/jwt.middleware.js";
+import { jwtVerifier, optionalJwtVerifier } from "../middleware/jwt.middleware.js";
 import { adminCheck } from "../middleware/admin.middleware.js";
 import { upload } from "../middleware/multer.middleware.js";
-import { addCategory, addCollection, addProduct, deleteCategory, deleteCollection, deleteProduct, getCategories, getCollections, getProductBySlug, getProducts, updateCategory, updateCollection, updateProduct } from "../controllers/product.controller.js";
+import { addCategory, addCollection, addOrUpdateReview, addProduct, deleteCategory, deleteCollection, deleteProduct, deleteReview, getCategories, getCollections, getProductBySlug, getProductReviews, getProducts, updateCategory, updateCollection, updateProduct } from "../controllers/product.controller.js";
 
 const prodRouter = Router()
 
 prodRouter.route('/categories').get(getCategories)
 prodRouter.route('/collections').get(getCollections)
 prodRouter.route('/products').get(getProducts)
-prodRouter.route('/products/:slug').get(getProductBySlug)
+prodRouter.route('/products/:slug').get(optionalJwtVerifier, getProductBySlug)
+prodRouter.route('/products/:productId/reviews').get(getProductReviews)
+prodRouter.route('/products/:productId/reviews').post(jwtVerifier, addOrUpdateReview)
+prodRouter.route('/reviews/:reviewId').delete(jwtVerifier, deleteReview)
 
 prodRouter.use(jwtVerifier, adminCheck)
 

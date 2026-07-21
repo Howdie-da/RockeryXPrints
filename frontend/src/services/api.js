@@ -39,6 +39,11 @@ export const addProductAPI    = (data)   => api.post('/prods/add-product', data,
 export const updateProductAPI = (productId, data) => api.post(`/prods/update-product/${productId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const deleteProductAPI = (productId) => api.delete(`/prods/delete-product/${productId}`);
 
+// ─── Reviews ───────────────────────────────────────────────────────────────
+export const addOrUpdateReviewAPI = (productId, data) => api.post(`/prods/products/${productId}/reviews`, data);
+export const getProductReviewsAPI = (productId) => api.get(`/prods/products/${productId}/reviews`);
+export const deleteReviewAPI = (reviewId) => api.delete(`/prods/reviews/${reviewId}`);
+
 // ─── Orders ────────────────────────────────────────────────────────────────
 export const createOrder = (data) => api.post('/orders/create', data);
 export const getOrders   = ()     => api.get('/orders/get-orders');
