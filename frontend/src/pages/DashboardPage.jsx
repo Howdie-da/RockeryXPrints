@@ -36,7 +36,7 @@ function OrderCard({ order, idx, isAdmin, onStatusChange }) {
     const newStatus = e.target.value;
     setUpdating(true);
     try {
-      await onStatusChange(order.orderId || order._id, newStatus);
+      await onStatusChange(order._id, newStatus);
     } catch (err) {
       // handled parent
     } finally {
@@ -138,6 +138,14 @@ function OrderCard({ order, idx, isAdmin, onStatusChange }) {
                 <span>STATUS</span>
                 <span className={PAYMENT_STYLES[order.paymentStatus]}>{order.paymentStatus.toUpperCase()}</span>
               </div>
+              <div className="pt-3 border-t border-neutral-300">
+                <Link
+                  to={`/orders/${order._id}`}
+                  className="w-full flex items-center justify-center gap-1.5 bg-black text-white font-space font-bold uppercase text-[10px] py-2 border-2 border-black hover:bg-white hover:text-black transition-colors duration-75"
+                >
+                  VIEW FULL DETAILS <ChevronRight size={12} />
+                </Link>
+              </div>
             </div>
           </motion.div>
         )}
@@ -195,7 +203,11 @@ function OrdersTab({ orders }) {
                     transition={{ ...spring, delay: idx * 0.05 }}
                     className="hover:bg-neutral-50 transition-colors duration-75"
                   >
-                    <td className="px-4 py-4 border-r-2 border-black font-bold">{order.orderId}</td>
+                    <td className="px-4 py-4 border-r-2 border-black font-bold">
+                      <Link to={`/orders/${order._id}`} className="hover:underline hover:text-neutral-600 transition-colors">
+                        {order.orderId}
+                      </Link>
+                    </td>
                     <td className="px-4 py-4 border-r-2 border-black text-neutral-500 whitespace-nowrap">
                       {new Date(order.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
                     </td>
@@ -227,6 +239,7 @@ function OrdersTab({ orders }) {
 /* ── Admin Orders Tab ── */
 function AdminOrdersTab({ allOrders, onStatusChange }) {
   const [updatingId, setUpdatingId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const handleStatusChange = async (orderId, newStatus) => {
     setUpdatingId(orderId);
@@ -239,27 +252,48 @@ function AdminOrdersTab({ allOrders, onStatusChange }) {
     }
   };
 
+  const filteredOrders = statusFilter === 'all'
+    ? allOrders
+    : allOrders.filter(o => o.orderStatus === statusFilter);
+
   return (
     <div>
-      <div className="flex items-end justify-between mb-6">
-        <h2 className="font-inter font-black text-3xl md:text-4xl uppercase tracking-tighter leading-none">
-          SYSTEM<br />ORDERS
-        </h2>
-        <span className="font-space text-xs text-neutral-500 uppercase tracking-wider border-2 border-black px-3 py-1 bg-black">
-          ADMIN MODE // {allOrders.length} ORDERS
-        </span>
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+        <div>
+          <h2 className="font-inter font-black text-3xl md:text-4xl uppercase tracking-tighter leading-none">
+            SYSTEM<br />ORDERS
+          </h2>
+        </div>
+        
+        {/* Brutalist Filter Selector */}
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <span className="font-space text-[10px] font-black uppercase text-neutral-400">STATUS:</span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border-2 border-black bg-white font-space text-[10px] font-bold px-2 py-1.5 focus:outline-none focus:ring-0 focus:border-black cursor-pointer uppercase"
+          >
+            <option value="all">ALL STATUSES ({allOrders.length})</option>
+            {STATUS_OPTIONS.map((opt) => {
+              const count = allOrders.filter(o => o.orderStatus === opt).length;
+              return (
+                <option key={opt} value={opt}>{opt.toUpperCase()} ({count})</option>
+              );
+            })}
+          </select>
+        </div>
       </div>
 
-      {allOrders.length === 0 ? (
+      {filteredOrders.length === 0 ? (
         <div className="border-4 border-black p-12 text-center bg-white">
           <Shield size={44} className="mx-auto mb-4 opacity-20" />
-          <p className="font-space text-sm uppercase tracking-wider text-neutral-400">NO ORDERS FOUND IN DATABASE</p>
+          <p className="font-space text-sm uppercase tracking-wider text-neutral-400">NO MATCHING ORDERS FOUND</p>
         </div>
       ) : (
         <>
           {/* Mobile view */}
           <div className="md:hidden flex flex-col gap-2">
-            {allOrders.map((o, i) => (
+            {filteredOrders.map((o, i) => (
               <OrderCard key={o._id} order={o} idx={i} isAdmin onStatusChange={handleStatusChange} />
             ))}
           </div>
@@ -269,7 +303,7 @@ function AdminOrdersTab({ allOrders, onStatusChange }) {
             <table className="w-full border-collapse font-space text-xs">
               <thead>
                 <tr className="bg-black text-white border-b-2 border-black">
-                  {['ORDER ID', 'BUYER', 'DATE', 'ITEMS', 'PAYMENT', 'STATUS', 'SET STATUS', 'TOTAL'].map((h) => (
+                  {['ORDER ID', 'BUYER', 'DATE', 'ITEMS', 'PAYMENT', 'STATUS', 'TOTAL'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-bold uppercase tracking-widest border-r border-neutral-700 last:border-r-0 whitespace-nowrap">
                       {h}
                     </th>
@@ -277,7 +311,7 @@ function AdminOrdersTab({ allOrders, onStatusChange }) {
                 </tr>
               </thead>
               <tbody className="divide-y-2 divide-black">
-                {allOrders.map((order, idx) => (
+                {filteredOrders.map((order, idx) => (
                   <motion.tr
                     key={order._id}
                     initial={{ opacity: 0, x: -10 }}
@@ -285,7 +319,11 @@ function AdminOrdersTab({ allOrders, onStatusChange }) {
                     transition={{ ...spring, delay: idx * 0.04 }}
                     className="hover:bg-neutral-50 transition-colors duration-75"
                   >
-                    <td className="px-4 py-4 border-r-2 border-black font-bold">{order.orderId || order._id.slice(-6)}</td>
+                    <td className="px-4 py-4 border-r-2 border-black font-bold">
+                      <Link to={`/orders/${order._id}`} className="hover:underline hover:text-neutral-600 transition-colors">
+                        {order.orderId || order._id.slice(-6)}
+                      </Link>
+                    </td>
                     <td className="px-4 py-4 border-r-2 border-black">
                       <div className="font-bold">{order.user?.fullName || 'GUEST'}</div>
                       <div className="text-[10px] text-neutral-500 lowercase">{order.user?.email}</div>
@@ -302,15 +340,10 @@ function AdminOrdersTab({ allOrders, onStatusChange }) {
                       {order.paymentStatus}
                     </td>
                     <td className="px-4 py-4 border-r-2 border-black">
-                      <span className={`inline-block border-2 px-2 py-0.5 uppercase tracking-wider font-bold ${STATUS_STYLES[order.orderStatus] || ''}`}>
-                        [ {order.orderStatus.toUpperCase()} ]
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 border-r-2 border-black">
                       <select
                         value={order.orderStatus}
-                        onChange={(e) => handleStatusChange(order.orderId || order._id, e.target.value)}
-                        disabled={updatingId === (order.orderId || order._id)}
+                        onChange={(e) => handleStatusChange(order._id, e.target.value)}
+                        disabled={updatingId === order._id}
                         className="border-2 border-black bg-white font-space text-[10px] font-bold px-2 py-1 focus:outline-none focus:ring-0 focus:border-black cursor-pointer"
                       >
                         {STATUS_OPTIONS.map((opt) => (
@@ -774,7 +807,7 @@ function ProfileTab({ user, onUpdateDetails }) {
                 {user.addresses.map((addr, index) => (
                   <div key={index} className="border-2 border-black p-3 bg-neutral-50 text-[10px] md:text-xs uppercase leading-relaxed font-space">
                     {addr.street}, {addr.city}, {addr.state} — {addr.zipCode}<br />
-                    {addr.country}
+                    {addr.country} {addr.phone && `· PHONE: ${addr.phone}`}
                   </div>
                 ))}
               </div>
@@ -811,26 +844,32 @@ export default function DashboardPage() {
   const fetchDashboardData = () => {
     if (!user) return;
     setLoading(true);
-    getOrders()
-      .then((res) => {
-        console.log("User: ", data)
-        if (Array.isArray(data)) setOrders(data);
-      })
-      .catch(() => {
-        setOrders([]);
-      });
 
-    if (user.role === 'admin') {
-      getAllOrdersAPI()
+    const promises = [
+      getOrders()
         .then((res) => {
           const data = res.data?.data;
-          if (Array.isArray(data)) setAllOrders(data);
+          if (Array.isArray(data)) setOrders(data);
         })
         .catch(() => {
-          setAllOrders([]);
-        });
+          setOrders([]);
+        })
+    ];
+
+    if (user.role === 'admin') {
+      promises.push(
+        getAllOrdersAPI()
+          .then((res) => {
+            const data = res.data?.data?.orders || res.data?.data || [];
+            if (Array.isArray(data)) setAllOrders(data);
+          })
+          .catch(() => {
+            setAllOrders([]);
+          })
+      );
     }
-    setLoading(false);
+
+    Promise.all(promises).finally(() => setLoading(false));
   };
 
   useEffect(() => {
@@ -845,7 +884,7 @@ export default function DashboardPage() {
   // Handler to update status (Admin only)
   const handleOrderStatusChange = async (orderId, newStatus) => {
     try {
-      await updateOrderStatusAPI(orderId, { orderStatus: newStatus });
+      await updateOrderStatusAPI(orderId, { status: newStatus });
       fetchDashboardData();
     } catch (err) {
       alert('FAILED TO UPDATE ORDER STATUS ON DATABASE.');

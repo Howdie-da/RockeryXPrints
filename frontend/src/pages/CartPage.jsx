@@ -1,10 +1,11 @@
 // src/pages/CartPage.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { Minus, Plus, Trash2, ArrowRight, ShoppingBag, ChevronDown } from 'lucide-react';
 import { removeFromCart, clearCart, updateQuantity } from '../store/cartSlice';
+import { createOrder } from '../services/api';
 import { mockProducts } from '../data/mockData';
 import Navbar from '../components/landing/Navbar';
 
@@ -32,7 +33,7 @@ const Field = ({ label, id, type = 'text', value, onChange, required, placeholde
 );
 
 // Collapsible order summary for mobile
-function MobileOrderSummary({ subtotal, mrpTotal, tax, finalTotal }) {
+function MobileOrderSummary({ subtotal, mrpTotal, tax, shippingFee, finalTotal }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="lg:hidden border-t-4 border-black bg-white sticky bottom-0 z-30 shadow-[0_-4px_0_0_#000]">
@@ -60,7 +61,7 @@ function MobileOrderSummary({ subtotal, mrpTotal, tax, finalTotal }) {
             <div className="px-5 py-4 bg-black text-white space-y-2 font-space text-xs border-t border-neutral-700">
               <div className="flex justify-between"><span className="text-neutral-400 uppercase">MRP</span><span className="line-through text-neutral-400">₹{mrpTotal.toLocaleString('en-IN')}</span></div>
               <div className="flex justify-between"><span className="text-neutral-400 uppercase">SUBTOTAL</span><span>₹{subtotal.toLocaleString('en-IN')}</span></div>
-              <div className="flex justify-between"><span className="text-neutral-400 uppercase">SHIPPING</span><span className="font-bold">FREE</span></div>
+              <div className="flex justify-between"><span className="text-neutral-400 uppercase">SHIPPING</span><span className="font-bold">{shippingFee > 0 ? `₹${shippingFee}` : 'FREE'}</span></div>
               <div className="flex justify-between"><span className="text-neutral-400 uppercase">TAX 18%</span><span>₹{tax.toLocaleString('en-IN')}</span></div>
             </div>
           </motion.div>
@@ -74,28 +75,95 @@ export default function CartPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { products: cartItems } = useSelector((s) => s.cart);
+  const { user } = useSelector((s) => s.auth);
+
   const [step, setStep] = useState(0);
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('online');
 
+  const [selectedAddressIdx, setSelectedAddressIdx] = useState('new');
   const [address, setAddress] = useState({
     street: '', city: '', state: '', zipCode: '', country: 'INDIA', phone: '',
   });
   const setAddr = (field) => (e) => setAddress((prev) => ({ ...prev, [field]: e.target.value }));
+
+  // Checkout states
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+  const [orderError, setOrderError] = useState('');
+  const [confirmedOrder, setConfirmedOrder] = useState(null);
+
+  // Pre-fill address if user has saved addresses
+  useEffect(() => {
+    if (user && user.addresses && user.addresses.length > 0) {
+      setSelectedAddressIdx(0);
+      const saved = user.addresses[0];
+      setAddress({
+        street: saved.street || '',
+        city: saved.city || '',
+        state: saved.state || '',
+        zipCode: saved.zipCode || '',
+        country: saved.country || 'INDIA',
+        phone: saved.phone || '',
+      });
+    } else {
+      setSelectedAddressIdx('new');
+    }
+  }, [user]);
 
   const displayItems = cartItems;
 
   const subtotal  = displayItems.reduce((s, i) => s + i.product.sellingPrice * i.quantity, 0);
   const mrpTotal  = displayItems.reduce((s, i) => s + i.product.mrp * i.quantity, 0);
   const tax       = Math.round(subtotal * 0.18);
-  const finalTotal = subtotal + tax;
+  const shippingFee = paymentMethod === 'cod' ? 50 : 0;
+  const finalTotal = subtotal + tax + shippingFee;
 
-  const handleConfirm = () => { dispatch(clearCart()); setOrderPlaced(true); };
+  const handleProceedToShipping = () => {
+    if (!user) {
+      navigate('/auth?redirect=/cart');
+    } else {
+      setStep(1);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (!user) {
+      navigate('/auth?redirect=/cart');
+      return;
+    }
+    setSubmittingOrder(true);
+    setOrderError('');
+    createOrder({
+      shippingAddress: {
+        street: address.street,
+        city: address.city,
+        state: address.state,
+        zipCode: Number(address.zipCode),
+        country: address.country,
+        phone: address.phone
+      },
+      paymentMethod
+    })
+    .then((res) => {
+      const order = res.data?.data;
+      if (order) {
+        setConfirmedOrder(order);
+        dispatch(clearCart());
+        setOrderPlaced(true);
+      }
+    })
+    .catch((err) => {
+      setOrderError(err.response?.data?.message || 'FAILED TO PLACE ORDER. PLEASE TRY AGAIN.');
+    })
+    .finally(() => {
+      setSubmittingOrder(false);
+    });
+  };
 
   /* ── ORDER CONFIRMED ── */
   if (orderPlaced) {
     return (
       <div className="min-h-dvh bg-black text-white flex flex-col items-center justify-center px-5 py-20 selection:bg-white selection:text-black">
-        <Navbar />
         <motion.div
           initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -108,6 +176,9 @@ export default function CartPage() {
           </h1>
           <div className="border-2 border-white px-6 py-5 font-space text-xs md:text-sm text-neutral-300 leading-relaxed max-w-sm mx-auto mb-8">
             THANK YOU FOR YOUR PURCHASE!<br />
+            {confirmedOrder?.orderId && (
+              <span className="font-bold text-white block mt-1 uppercase tracking-wider">// ORDER ID: {confirmedOrder.orderId}</span>
+            )}
             WE HAVE SENT YOUR RECEIPT AND SHIPPING DETAILS TO YOUR EMAIL ADDRESS.
           </div>
           <Link
@@ -250,10 +321,10 @@ export default function CartPage() {
 
                 <div className="flex justify-end mt-5 mb-28 lg:mb-0">
                   <motion.button
-                    onClick={() => setStep(1)}
+                    onClick={handleProceedToShipping}
                     whileTap={{ scale: 0.98 }}
                     transition={spring}
-                    className="flex items-center gap-2 bg-black text-white font-space font-bold uppercase text-sm px-6 md:px-8 py-4 border-2 border-black shadow-solid hover:bg-white hover:text-black transition-colors duration-75 touch-manipulation w-full md:w-auto justify-center"
+                    className="flex items-center gap-2 bg-black text-white font-space font-bold uppercase text-sm px-6 md:px-8 py-4 border-2 border-black shadow-solid hover:bg-white hover:text-black transition-colors duration-75 touch-manipulation w-full md:w-auto justify-center cursor-pointer"
                   >
                     PROCEED TO SHIPPING <ArrowRight size={16} />
                   </motion.button>
@@ -269,23 +340,90 @@ export default function CartPage() {
                 </h2>
 
                 <form onSubmit={(e) => { e.preventDefault(); setStep(2); }} className="flex flex-col gap-6">
-                  <Field label="STREET ADDRESS" id="street" value={address.street} onChange={setAddr('street')} required placeholder="44 BRUTALIST LANE" />
+                  
+                  {/* Saved Address Chooser */}
+                  {user?.addresses && user.addresses.length > 0 && (
+                    <div className="mb-2">
+                      <label className="font-space text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-3">
+                        CHOOSE A SHIPPING ADDRESS:
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {user.addresses.map((addr, idx) => {
+                          const isSelected = selectedAddressIdx === idx;
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => {
+                                setSelectedAddressIdx(idx);
+                                setAddress({
+                                  street: addr.street || '',
+                                  city: addr.city || '',
+                                  state: addr.state || '',
+                                  zipCode: addr.zipCode || '',
+                                  country: addr.country || 'INDIA',
+                                  phone: addr.phone || '',
+                                });
+                              }}
+                              className={`border-2 p-4 cursor-pointer text-left font-space text-[10px] md:text-xs uppercase transition-colors duration-75 ${
+                                isSelected ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-neutral-50'
+                              }`}
+                            >
+                              <div className="font-bold flex items-center justify-between mb-2 pb-1 border-b border-dashed border-neutral-300">
+                                <span>SAVED ADDRESS #{idx + 1}</span>
+                                {isSelected && <span className="bg-white text-black border-2 border-white px-1.5 py-0.5 text-[8px] font-bold">SELECTED</span>}
+                              </div>
+                              <div className="leading-relaxed">
+                                {addr.street}<br />
+                                {addr.city}, {addr.state} — {addr.zipCode}<br />
+                                {addr.country} {addr.phone && `· PHONE: ${addr.phone}`}
+                              </div>
+                            </div>
+                          );
+                        })}
 
-                  {/* Two-col on md+ */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <Field label="CITY" id="city" value={address.city} onChange={setAddr('city')} required placeholder="NEW DELHI" />
-                    <Field label="STATE" id="state" value={address.state} onChange={setAddr('state')} required placeholder="DELHI" />
-                    <Field label="ZIP / POSTAL CODE" id="zip" value={address.zipCode} onChange={setAddr('zipCode')} required placeholder="110001" />
-                    <Field label="COUNTRY" id="country" value={address.country} onChange={setAddr('country')} required placeholder="INDIA" />
-                  </div>
+                        {/* Option to use a custom address */}
+                        <div
+                          onClick={() => {
+                            setSelectedAddressIdx('new');
+                            setAddress({ street: '', city: '', state: '', zipCode: '', country: 'INDIA', phone: '' });
+                          }}
+                          className={`border-2 p-4 cursor-pointer text-left font-space text-[10px] md:text-xs uppercase flex flex-col justify-center items-center gap-1.5 transition-colors duration-75 min-h-24 ${
+                            selectedAddressIdx === 'new' ? 'bg-black text-white border-black' : 'bg-white text-black border-black hover:bg-neutral-50'
+                          }`}
+                        >
+                          <span className="font-black text-base">+</span>
+                          <span className="font-bold">ADD NEW ADDRESS</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                  <Field label="PHONE NUMBER" id="phone" type="tel" value={address.phone} onChange={setAddr('phone')} required placeholder="+91 98765 43210" />
+                  {selectedAddressIdx === 'new' && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={spring}
+                      className="space-y-6"
+                    >
+                      <Field label="STREET ADDRESS" id="street" value={address.street} onChange={setAddr('street')} required placeholder="44 BRUTALIST LANE" />
+
+                      {/* Two-col on md+ */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <Field label="CITY" id="city" value={address.city} onChange={setAddr('city')} required placeholder="NEW DELHI" />
+                        <Field label="STATE" id="state" value={address.state} onChange={setAddr('state')} required placeholder="DELHI" />
+                        <Field label="ZIP / POSTAL CODE" id="zip" value={address.zipCode} onChange={setAddr('zipCode')} required placeholder="110001" />
+                        <Field label="COUNTRY" id="country" value={address.country} onChange={setAddr('country')} required placeholder="INDIA" />
+                      </div>
+
+                      <Field label="PHONE NUMBER" id="phone" type="tel" value={address.phone} onChange={setAddr('phone')} required placeholder="+91 98765 43210" />
+                    </motion.div>
+                  )}
 
                   <div className="flex flex-col sm:flex-row gap-3 mt-2 mb-28 lg:mb-0">
                     <button
                       type="button"
                       onClick={() => setStep(0)}
-                      className="flex items-center justify-center gap-2 bg-white text-black font-space font-bold uppercase text-sm px-6 py-4 border-2 border-black hover:bg-black hover:text-white transition-colors duration-75 touch-manipulation"
+                      className="flex items-center justify-center gap-2 bg-white text-black font-space font-bold uppercase text-sm px-6 py-4 border-2 border-black hover:bg-black hover:text-white transition-colors duration-75 touch-manipulation cursor-pointer"
                     >
                       ← BACK
                     </button>
@@ -293,7 +431,7 @@ export default function CartPage() {
                       type="submit"
                       whileTap={{ scale: 0.98 }}
                       transition={spring}
-                      className="flex-1 flex items-center justify-center gap-2 bg-black text-white font-space font-bold uppercase text-sm px-8 py-4 border-2 border-black shadow-solid hover:bg-white hover:text-black transition-colors duration-75 touch-manipulation"
+                      className="flex-1 flex items-center justify-center gap-2 bg-black text-white font-space font-bold uppercase text-sm px-8 py-4 border-2 border-black shadow-solid hover:bg-white hover:text-black transition-colors duration-75 touch-manipulation cursor-pointer"
                     >
                       REVIEW ORDER <ArrowRight size={16} />
                     </motion.button>
@@ -321,7 +459,7 @@ export default function CartPage() {
                   ))}
                 </div>
 
-                <div className="border-2 border-black p-4 font-space text-[10px] md:text-xs mb-6">
+                <div className="border-2 border-black p-4 font-space text-[10px] md:text-xs mb-5">
                   <div className="font-bold uppercase tracking-wider mb-2 text-neutral-500">SHIPPING ADDRESS</div>
                   <div className="uppercase leading-relaxed text-[10px] md:text-xs">
                     {address.street || '44 BRUTALIST LANE'}, {address.city || 'NEW DELHI'}, {address.state || 'DELHI'} — {address.zipCode || '110001'}<br />
@@ -329,20 +467,49 @@ export default function CartPage() {
                   </div>
                 </div>
 
+                {/* Brutalist Payment Selector */}
+                <div className="border-2 border-black p-4 font-space mb-6">
+                  <div className="font-bold uppercase tracking-wider text-[10px] md:text-xs text-neutral-500 mb-3">SELECT PAYMENT METHOD</div>
+                  <div className="flex flex-col gap-2">
+                    <label className={`flex items-center justify-between p-3 border-2 border-black cursor-pointer transition-colors duration-75 text-xs font-bold uppercase ${paymentMethod === 'online' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-50'}`}>
+                      <span className="flex items-center gap-2">
+                        <input type="radio" name="payment" value="online" checked={paymentMethod === 'online'} onChange={() => setPaymentMethod('online')} className="accent-black" />
+                        ONLINE PAYMENT (FREE SHIPPING)
+                      </span>
+                      <span>₹{(subtotal + tax).toLocaleString('en-IN')}</span>
+                    </label>
+                    <label className={`flex items-center justify-between p-3 border-2 border-black cursor-pointer transition-colors duration-75 text-xs font-bold uppercase ${paymentMethod === 'cod' ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-50'}`}>
+                      <span className="flex items-center gap-2">
+                        <input type="radio" name="payment" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} className="accent-black" />
+                        CASH ON DELIVERY (+₹50 COD FEE)
+                      </span>
+                      <span>₹{(subtotal + tax + 50).toLocaleString('en-IN')}</span>
+                    </label>
+                  </div>
+                </div>
+
+                {orderError && (
+                  <div className="border-2 border-black bg-black text-white font-space font-bold text-xs uppercase p-4 mb-6 leading-relaxed">
+                    ⚠ {orderError}
+                  </div>
+                )}
+
                 <div className="flex flex-col sm:flex-row gap-3 mb-28 lg:mb-0">
                   <button
                     onClick={() => setStep(1)}
-                    className="flex items-center justify-center gap-2 bg-white text-black font-space font-bold uppercase text-sm px-6 py-4 border-2 border-black hover:bg-black hover:text-white transition-colors duration-75 touch-manipulation"
+                    disabled={submittingOrder}
+                    className="flex items-center justify-center gap-2 bg-white text-black font-space font-bold uppercase text-sm px-6 py-4 border-2 border-black hover:bg-black hover:text-white transition-colors duration-75 touch-manipulation cursor-pointer disabled:opacity-50"
                   >
                     ← BACK
                   </button>
                   <motion.button
                     onClick={handleConfirm}
+                    disabled={submittingOrder}
                     whileTap={{ scale: 0.98 }}
                     transition={spring}
-                    className="flex-1 flex items-center justify-center gap-2 bg-black text-white font-space font-bold uppercase text-sm px-8 py-4 border-2 border-black shadow-solid hover:bg-white hover:text-black transition-colors duration-75 touch-manipulation cursor-pointer"
+                    className="flex-1 flex items-center justify-center gap-2 bg-black text-white font-space font-bold uppercase text-sm px-8 py-4 border-2 border-black shadow-solid hover:bg-white hover:text-black transition-colors duration-75 touch-manipulation cursor-pointer disabled:opacity-50"
                   >
-                    PLACE ORDER <ArrowRight size={16} />
+                    {submittingOrder ? 'PLACING ORDER...' : <>PLACE ORDER <ArrowRight size={16} /></>}
                   </motion.button>
                 </div>
               </motion.div>
@@ -358,7 +525,7 @@ export default function CartPage() {
               <div className="space-y-3 font-space text-sm">
                 <div className="flex justify-between"><span className="text-neutral-400 uppercase">MRP</span><span className="line-through text-neutral-400">₹{mrpTotal.toLocaleString('en-IN')}</span></div>
                 <div className="flex justify-between"><span className="text-neutral-400 uppercase">SUBTOTAL</span><span>₹{subtotal.toLocaleString('en-IN')}</span></div>
-                <div className="flex justify-between"><span className="text-neutral-400 uppercase">SHIPPING</span><span className="font-bold">FREE</span></div>
+                <div className="flex justify-between"><span className="text-neutral-400 uppercase">SHIPPING</span><span className="font-bold">{shippingFee > 0 ? `₹${shippingFee}` : 'FREE'}</span></div>
                 <div className="flex justify-between"><span className="text-neutral-400 uppercase">TAX 18%</span><span>₹{tax.toLocaleString('en-IN')}</span></div>
               </div>
               <div className="border-t-2 border-white mt-5 pt-5 flex justify-between items-baseline">
@@ -374,7 +541,7 @@ export default function CartPage() {
       </div>
 
       {/* Mobile sticky summary */}
-      <MobileOrderSummary subtotal={subtotal} mrpTotal={mrpTotal} tax={tax} finalTotal={finalTotal} />
+      <MobileOrderSummary subtotal={subtotal} mrpTotal={mrpTotal} tax={tax} shippingFee={shippingFee} finalTotal={finalTotal} />
     </div>
   );
 }

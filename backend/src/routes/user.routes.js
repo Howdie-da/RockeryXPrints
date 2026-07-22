@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { upload } from "../middleware/multer.middleware.js";
-import { addToCart, changePassword, getCurrentUser, getUserCart, loginUser, logoutUser, refreshAccessToken, registerUser, removeFromCart, updateAccountDetails, updateAvatar } from "../controllers/user.controller.js";
+import { addToCart, changePassword, getCurrentUser, getUserCart, loginUser, logoutUser, refreshAccessToken, registerUser, removeFromCart, updateAccountDetails, updateAvatar, updateCartQuantity } from "../controllers/user.controller.js";
 import { jwtVerifier } from "../middleware/jwt.middleware.js";
 
 const userRouter = Router()
@@ -40,6 +40,8 @@ userRouter.route('/update-avatar').post(
 userRouter.route('/cart').get(getUserCart)
 
 userRouter.route('/add-cart').post(addToCart)
+
+userRouter.route('/update-cart-qty').post(updateCartQuantity)
 
 userRouter.route('/remove-cart/:productId').delete(removeFromCart)
 

@@ -5,7 +5,8 @@ import { Provider, useDispatch } from 'react-redux'
 import './index.css'
 import { store } from './store/store.js'
 import { setUser } from './store/authSlice'
-import { getCurrentUser } from './services/api'
+import { setCart } from './store/cartSlice'
+import { getCurrentUser, getUserCart } from './services/api'
 
 // Pages
 import Home from './pages/Home.jsx'
@@ -13,6 +14,7 @@ import AuthPage from './pages/AuthPage.jsx'
 import ProductDetailPage from './pages/ProductDetailPage.jsx'
 import CartPage from './pages/CartPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
+import OrderDetailPage from './pages/OrderDetailPage.jsx'
 import NotFoundPage from './pages/NotFoundPage.jsx'
 import CategoriesPage from './pages/CategoriesPage.jsx'
 import CollectionsPage from './pages/CollectionsPage.jsx'
@@ -39,6 +41,10 @@ const router = createBrowserRouter([
   {
     path: '/dashboard',
     element: <DashboardPage />,
+  },
+  {
+    path: '/orders/:orderId',
+    element: <OrderDetailPage />,
   },
   {
     path: '/collections',
@@ -72,6 +78,13 @@ function AppWrapper({ children }) {
         const user = res.data?.data;
         if (user) {
           dispatch(setUser({ user }));
+          return getUserCart();
+        }
+      })
+      .then((cartRes) => {
+        if (cartRes) {
+          const cartItems = cartRes.data?.data || [];
+          dispatch(setCart(cartItems));
         }
       })
       .catch(() => {})

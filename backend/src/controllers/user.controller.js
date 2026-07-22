@@ -331,6 +331,50 @@ const removeFromCart = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user.cart, "Item removed from cart"));
 })
 
+const updateCartQuantity = asyncHandler(async (req, res) => {
+    const { productId, quantity } = req.body;
+    const qty = Number(quantity);
+
+    if (!productId || qty === undefined || qty < 0) {
+        throw new ApiError(400, "Invalid product or quantity");
+    }
+
+    const user = await User.findById(req.user._id);
+    const existingCartItemIndex = user.cart.findIndex(
+        (item) => item.product.toString() === productId.toString()
+    );
+
+    if (existingCartItemIndex > -1) {
+        if (qty === 0) {
+            user.cart.splice(existingCartItemIndex, 1);
+        } else {
+            const product = await Product.findById(productId);
+            if (!product) {
+                throw new ApiError(404, "Product not found");
+            }
+            user.cart[existingCartItemIndex].quantity = Math.min(qty, product.stock);
+        }
+    } else if (qty > 0) {
+        const product = await Product.findById(productId);
+        if (!product) {
+            throw new ApiError(404, "Product not found");
+        }
+        user.cart.push({ product: productId, quantity: Math.min(qty, product.stock) });
+    }
+
+    await user.save({ validateBeforeSave: false });
+    
+    // Fetch populated cart to return
+    const populatedUser = await User.findById(req.user._id).populate(
+        "cart.product",
+        "name sellingPrice mrp images slug stock"
+    );
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, populatedUser.cart, "Cart quantity updated"));
+});
+
 export {
     registerUser,
     loginUser,
@@ -342,5 +386,6 @@ export {
     updateAvatar,
     getUserCart,
     addToCart,
-    removeFromCart
+    removeFromCart,
+    updateCartQuantity
 }

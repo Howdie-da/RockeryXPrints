@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import { useDispatch } from 'react-redux';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { setUser } from '../store/authSlice';
-import { loginUser, registerUser } from '../services/api';
+import { setCart } from '../store/cartSlice';
+import { loginUser, registerUser, getUserCart } from '../services/api';
 
 const spring = { type: 'spring', bounce: 0, duration: 0.3 };
 
@@ -55,17 +56,25 @@ export default function AuthPage() {
 
     setLoading(true);
     try {
-      if (mode === 'login') {
-        const res = await loginUser({ email: form.email, password: form.password });
-        const userObj = res.data?.data?.user || res.data?.data;
-        dispatch(setUser({ user: userObj }));
-        navigate('/dashboard');
-      } else {
-        const res = await registerUser({ fullName: form.fullName, email: form.email, password: form.password });
-        const userObj = res.data?.data?.user || res.data?.data;
-        dispatch(setUser({ user: userObj }));
-        navigate('/dashboard');
-      }
+        const queryParams = new URLSearchParams(window.location.search);
+        const redirectPath = queryParams.get('redirect') || '/dashboard';
+        if (mode === 'login') {
+          const res = await loginUser({ email: form.email, password: form.password });
+          const userObj = res.data?.data?.user || res.data?.data;
+          dispatch(setUser({ user: userObj }));
+          // Fetch their cart from database
+          getUserCart()
+            .then((cartRes) => {
+              dispatch(setCart(cartRes.data?.data || []));
+            })
+            .catch(() => {});
+          navigate(redirectPath);
+        } else {
+          const res = await registerUser({ fullName: form.fullName, email: form.email, password: form.password });
+          const userObj = res.data?.data?.user || res.data?.data;
+          dispatch(setUser({ user: userObj }));
+          navigate(redirectPath);
+        }
     } catch (err) {
       setError(err?.response?.data?.message || 'AUTHENTICATION FAILED. RETRY.');
     } finally {

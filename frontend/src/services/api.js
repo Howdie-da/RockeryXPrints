@@ -22,8 +22,8 @@ export const updateAvatarAPI = (data) => api.post('/users/update-avatar', data, 
 // ─── Cart ──────────────────────────────────────────────────────────────────
 export const getUserCart    = ()     => api.get('/users/cart');
 export const addToCartAPI   = (data) => api.post('/users/add-cart', data);
-export const removeFromCartAPI = (productId) =>
-  api.delete(`/users/remove-cart/${productId}`);
+export const updateCartQuantityAPI = (productId, quantity) => api.post('/users/update-cart-qty', { productId, quantity });
+export const removeFromCartAPI = (productId) => api.delete(`/users/remove-cart/${productId}`);
 
 // ─── Products ──────────────────────────────────────────────────────────────
 export const getCategories    = (isAdmin = false) => isAdmin ? api.get('/prods/admin/categories') : api.get('/prods/categories');
@@ -47,8 +47,9 @@ export const deleteReviewAPI = (reviewId) => api.delete(`/prods/reviews/${review
 // ─── Orders ────────────────────────────────────────────────────────────────
 export const createOrder = (data) => api.post('/orders/create', data);
 export const getOrders   = ()     => api.get('/orders/get-orders');
+export const getOrderByIdAPI = (orderId) => api.get(`/orders/${orderId}`);
+export const cancelMyOrderAPI = (orderId) => api.patch(`/orders/cancel/${orderId}`);
 export const getAllOrdersAPI = () => api.get('/orders/get-all-orders');
 export const updateOrderStatusAPI = (orderId, data) => api.patch(`/orders/update-status/${orderId}`, data);
 
 export default api;
-

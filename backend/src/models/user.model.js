@@ -46,7 +46,8 @@ const userSchema = new mongoose.Schema({
         city: String,
         state: String,
         zipCode: Number,
-        country: String
+        country: String,
+        phone: String
     }],
 
     isEmailVerified: {
