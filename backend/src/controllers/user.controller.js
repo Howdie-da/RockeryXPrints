@@ -8,7 +8,8 @@ import { Product } from "../models/product.model.js";
 
 const options = {
     httpOnly: true,
-    secure: true
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax"
 }
 
 const generateToken = async (userId) => {
@@ -17,6 +18,9 @@ const generateToken = async (userId) => {
         const accessToken = await user.generateAccessToken()
         const refreshToken = await user.generateRefreshToken()
 
+        if (user.refreshToken.length >= 5) {
+            user.refreshToken.shift() // Drop oldest session token
+        }
         user.refreshToken.push(refreshToken)
         await user.save({ validateBeforeSave: false })
 
@@ -118,17 +122,16 @@ const loginUser = asyncHandler(async (req, res) => {
 const logoutUser = asyncHandler(async (req, res) => {
     const refreshToken = req.cookies?.refreshToken;
 
-    await User.findByIdAndUpdate(
-        req.user?._id,
-        {
-            $pull: {
-                refreshToken: refreshToken
+    if (req.user?._id) {
+        await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                $pull: {
+                    refreshToken: refreshToken
+                }
             }
-        },
-        {
-            returnDocument: 'after'
-        }
-    )
+        ).catch(() => {});
+    }
 
     return res
     .status(200)

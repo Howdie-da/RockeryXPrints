@@ -1,32 +1,32 @@
 import { User } from "../models/user.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import jwt from "jsonwebtoken"
+import jwt from "jsonwebtoken";
 
 export const jwtVerifier = asyncHandler(async (req, res, next) => {
     try {
-        const token = req.cookies?.accessToken
+        const token = req.cookies?.accessToken || req.header("Authorization")?.replace("Bearer ", "");
     
         if (!token) {
-            throw new ApiError(400, "User is not authenticated.")
+            throw new ApiError(401, "User is not authenticated.");
         }
     
-        const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET)
+        const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     
         const user = await User.findById(decodedToken?._id).select(
             "-password -refreshToken"
-        )
+        );
     
         if (!user) {
-            throw new ApiError(401, "Invalid Token")
+            throw new ApiError(401, "Invalid Token");
         }
     
-        req.user = user
-        next()
+        req.user = user;
+        next();
     } catch (error) {
-        throw new ApiError(401, error?.message || "Invalid Access Token")
+        throw new ApiError(401, error?.message || "Invalid Access Token");
     }
-})
+});
 
 export const optionalJwtVerifier = asyncHandler(async (req, res, next) => {
     try {
@@ -42,4 +42,4 @@ export const optionalJwtVerifier = asyncHandler(async (req, res, next) => {
         // Silently skip unauthenticated errors for optional auth
     }
     next();
-})
+});

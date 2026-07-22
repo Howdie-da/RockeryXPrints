@@ -12,6 +12,7 @@ export default function Popup({
   message = 'ARE YOU ABSOLUTELY SURE?',
   confirmText = 'YES, CONFIRM',
   cancelText = 'NO, CANCEL',
+  singleButton = false,
   onConfirm,
   onCancel
 }) {
@@ -52,15 +53,17 @@ export default function Popup({
             </p>
 
             {/* Action buttons */}
-            <div className="grid grid-cols-2 gap-3 w-full font-space text-xs">
+            <div className={`grid ${singleButton ? 'grid-cols-1' : 'grid-cols-2'} gap-3 w-full font-space text-xs`}>
+              {!singleButton && (
+                <button
+                  onClick={onCancel}
+                  className="border-2 border-black bg-white hover:bg-neutral-100 text-black font-bold uppercase py-3 border-solid transition-colors duration-100 cursor-pointer touch-manipulation"
+                >
+                  {cancelText}
+                </button>
+              )}
               <button
-                onClick={onCancel}
-                className="border-2 border-black bg-white hover:bg-neutral-100 text-black font-bold uppercase py-3 border-solid transition-colors duration-100 cursor-pointer touch-manipulation"
-              >
-                {cancelText}
-              </button>
-              <button
-                onClick={onConfirm}
+                onClick={onConfirm || onCancel}
                 className="border-2 border-black bg-black hover:bg-white hover:text-black text-white font-bold uppercase py-3 border-solid transition-colors duration-100 cursor-pointer touch-manipulation"
               >
                 {confirmText}

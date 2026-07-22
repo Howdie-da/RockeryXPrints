@@ -4,9 +4,7 @@ import { Link, NavLink, useNavigate, useLocation } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSelector, useDispatch } from 'react-redux';
 import { Menu, X, ArrowRight, ShoppingBag, User } from 'lucide-react';
-import { logout } from '../../store/authSlice';
-import { clearCart } from '../../store/cartSlice';
-import { logoutUser } from '../../services/api';
+import { logoutThunk } from '../../store/authSlice';
 
 const spring = { type: 'spring', stiffness: 300, damping: 25 };
 
@@ -40,17 +38,9 @@ export default function Navbar() {
   }, []);
 
   const handleLogout = () => {
-    logoutUser()
-      .then(() => {
-        dispatch(logout());
-        dispatch(clearCart());
-        navigate('/');
-      })
-      .catch(() => {
-        dispatch(logout());
-        dispatch(clearCart());
-        navigate('/');
-      });
+    dispatch(logoutThunk()).then(() => {
+      navigate('/');
+    });
   };
 
   return (

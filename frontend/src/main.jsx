@@ -1,12 +1,11 @@
-import { StrictMode, useState, useEffect } from 'react'
+import { StrictMode, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { Provider, useDispatch } from 'react-redux'
 import './index.css'
 import { store } from './store/store.js'
-import { setUser } from './store/authSlice'
-import { setCart } from './store/cartSlice'
-import { getCurrentUser, getUserCart } from './services/api'
+import { fetchCurrentUser } from './store/authSlice'
+import { fetchCart } from './store/cartSlice'
 
 // Pages
 import Home from './pages/Home.jsx'
@@ -70,45 +69,24 @@ const router = createBrowserRouter([
 
 function AppWrapper({ children }) {
   const dispatch = useDispatch();
-  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    getCurrentUser()
-      .then((res) => {
-        const user = res.data?.data;
-        if (user) {
-          dispatch(setUser({ user }));
-          return getUserCart();
-        }
-      })
-      .then((cartRes) => {
-        if (cartRes) {
-          const cartItems = cartRes.data?.data || [];
-          dispatch(setCart(cartItems));
-        }
-      })
-      .catch(() => {})
-      .finally(() => setChecking(false));
+    dispatch(fetchCurrentUser()).then((action) => {
+      if (fetchCurrentUser.fulfilled.match(action) && action.payload) {
+        dispatch(fetchCart());
+      }
+    });
   }, [dispatch]);
-
-  if (checking) {
-    return (
-      <div className="min-h-screen bg-white text-black font-space flex flex-col items-center justify-center p-6 text-center select-none">
-        <div className="w-10 h-10 border-4 border-black border-t-transparent animate-spin mb-4 shrink-0 rounded-none" />
-        <span className="font-space text-xs font-bold uppercase tracking-widest text-neutral-400">
-          LOADING PROFILE...
-        </span>
-      </div>
-    );
-  }
 
   return children;
 }
 
 createRoot(document.getElementById('root')).render(
-  <Provider store={store}>
-    <AppWrapper>
-      <RouterProvider router={router} />
-    </AppWrapper>
-  </Provider>
+  <StrictMode>
+    <Provider store={store}>
+      <AppWrapper>
+        <RouterProvider router={router} />
+      </AppWrapper>
+    </Provider>
+  </StrictMode>
 )

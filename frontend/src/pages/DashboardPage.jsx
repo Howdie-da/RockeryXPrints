@@ -4,9 +4,10 @@ import { Link, useNavigate } from 'react-router';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDispatch, useSelector } from 'react-redux';
 import { Package, Settings, LogOut, ChevronRight, ChevronDown, User, Shield, Check, Edit2, Upload } from 'lucide-react';
-import { logout, setUser } from '../store/authSlice';
+import { logoutThunk, setUser } from '../store/authSlice';
 import { updateDetails, changePassword, getOrders, getAllOrdersAPI, updateOrderStatusAPI, updateAvatarAPI } from '../services/api';
 import Navbar from '../components/landing/Navbar';
+import Popup from '../components/landing/Popup';
 
 const spring = { type: 'spring', bounce: 0, duration: 0.25 };
 
@@ -833,6 +834,26 @@ export default function DashboardPage() {
   const [allOrders, setAllOrders] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const [alertPopup, setAlertPopup] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'OK',
+    singleButton: true,
+    onConfirm: null
+  });
+
+  const triggerAlert = (message, title = 'NOTIFICATION', onConfirm = null, singleButton = true, confirmText = 'OK') => {
+    setAlertPopup({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      singleButton,
+      onConfirm
+    });
+  };
+
   // Redirect if not logged in
   useEffect(() => {
     if (!user) {
@@ -887,7 +908,7 @@ export default function DashboardPage() {
       await updateOrderStatusAPI(orderId, { status: newStatus });
       fetchDashboardData();
     } catch (err) {
-      alert('FAILED TO UPDATE ORDER STATUS ON DATABASE.');
+      triggerAlert('FAILED TO UPDATE ORDER STATUS ON DATABASE.', 'ERROR OCCURRED');
     }
   };
 
@@ -907,8 +928,9 @@ export default function DashboardPage() {
   ];
 
   const handleLogout = () => {
-    dispatch(logout());
-    navigate('/auth');
+    dispatch(logoutThunk()).then(() => {
+      navigate('/auth');
+    });
   };
 
   return (
@@ -993,6 +1015,20 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* General Alert/Confirm Popup */}
+      <Popup
+        isOpen={alertPopup.isOpen}
+        title={alertPopup.title}
+        message={alertPopup.message}
+        confirmText={alertPopup.confirmText}
+        singleButton={alertPopup.singleButton}
+        onConfirm={() => {
+          alertPopup.onConfirm?.();
+          setAlertPopup((prev) => ({ ...prev, isOpen: false }));
+        }}
+        onCancel={() => setAlertPopup((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }

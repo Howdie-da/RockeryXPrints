@@ -48,6 +48,26 @@ export default function CategoryDetailPage() {
   const [deletePopupOpen, setDeletePopupOpen] = useState(false);
   const [createPopupOpen, setCreatePopupOpen] = useState(false);
 
+  const [alertPopup, setAlertPopup] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'OK',
+    singleButton: true,
+    onConfirm: null
+  });
+
+  const triggerAlert = (message, title = 'NOTIFICATION', onConfirm = null, singleButton = true, confirmText = 'OK') => {
+    setAlertPopup({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      singleButton,
+      onConfirm
+    });
+  };
+
   // Fetch category data matching slug and filter products
   const fetchCategoryDetails = async () => {
     setLoading(true);
@@ -187,7 +207,7 @@ export default function CategoryDetailPage() {
       await deleteCategoryAPI(category._id);
       navigate('/categories');
     } catch (err) {
-      alert(err?.response?.data?.message || 'FAILED TO DELETE CATEGORY. ENSURE IT HAS ZERO PRODUCTS.');
+      triggerAlert(err?.response?.data?.message || 'FAILED TO DELETE CATEGORY. ENSURE IT HAS ZERO PRODUCTS.', 'ERROR OCCURRED');
     }
   };
 
@@ -576,6 +596,20 @@ export default function CategoryDetailPage() {
         cancelText="NO, CANCEL"
         onConfirm={handleConfirmCreateProduct}
         onCancel={() => setCreatePopupOpen(false)}
+      />
+
+      {/* General Alert/Confirm Popup */}
+      <Popup
+        isOpen={alertPopup.isOpen}
+        title={alertPopup.title}
+        message={alertPopup.message}
+        confirmText={alertPopup.confirmText}
+        singleButton={alertPopup.singleButton}
+        onConfirm={() => {
+          alertPopup.onConfirm?.();
+          setAlertPopup((prev) => ({ ...prev, isOpen: false }));
+        }}
+        onCancel={() => setAlertPopup((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

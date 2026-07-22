@@ -40,6 +40,48 @@
     repeating-linear-gradient(90deg,  transparent, transparent 11px, #e5e5e5 11px, #e5e5e5 12px);
 }
 
+/* Form input baseline utility — prevents mobile Safari zoom without inline style hacks */
+@utility input-brutal {
+  width: 100%;
+  background-color: transparent;
+  border-bottom-width: 4px;
+  border-color: #000000;
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+  font-family: var(--font-space);
+  font-size: 1rem;
+  color: #000000;
+  outline: none;
+
+  &::placeholder {
+    color: #a3a3a3;
+  }
+}
+
+@utility btn-brutal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #000000;
+  color: #ffffff;
+  font-family: var(--font-space);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  padding: 0.875rem 1.5rem;
+  border: 2px solid #000000;
+  transition: background-color 75ms ease, color 75ms ease;
+  cursor: pointer;
+  touch-action: manipulation;
+
+  &:hover {
+    background-color: #ffffff;
+    color: #000000;
+  }
+}
+
 /* ── Custom Scrollbar ─────────────────────────────────────────────────────── */
 ::-webkit-scrollbar       { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: #ffffff; border-left: 3px solid #000000; }

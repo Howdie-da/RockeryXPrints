@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { upload } from "../middleware/multer.middleware.js";
 import { addToCart, changePassword, getCurrentUser, getUserCart, loginUser, logoutUser, refreshAccessToken, registerUser, removeFromCart, updateAccountDetails, updateAvatar, updateCartQuantity } from "../controllers/user.controller.js";
-import { jwtVerifier } from "../middleware/jwt.middleware.js";
+import { jwtVerifier, optionalJwtVerifier } from "../middleware/jwt.middleware.js";
 
-const userRouter = Router()
+const userRouter = Router();
 
 userRouter.route('/register').post(
     upload.fields([
@@ -13,21 +13,23 @@ userRouter.route('/register').post(
         }
     ]),
     registerUser
-)
+);
 
-userRouter.route('/login').post(loginUser)
+userRouter.route('/login').post(loginUser);
 
-userRouter.use(jwtVerifier)
+// Logout should always succeed regardless of whether token is valid or expired
+userRouter.route('/logout').get(optionalJwtVerifier, logoutUser);
+userRouter.route('/logout').post(optionalJwtVerifier, logoutUser);
 
-userRouter.route('/logout').get(logoutUser)
+userRouter.use(jwtVerifier);
 
-userRouter.route('/change-password').post(changePassword)
+userRouter.route('/change-password').post(changePassword);
 
-userRouter.route('/refresh-token').post(refreshAccessToken)
+userRouter.route('/refresh-token').post(refreshAccessToken);
 
-userRouter.route('/current-user').get(getCurrentUser)
+userRouter.route('/current-user').get(getCurrentUser);
 
-userRouter.route('/update-details').post(updateAccountDetails)
+userRouter.route('/update-details').post(updateAccountDetails);
 
 userRouter.route('/update-avatar').post(
     upload.fields([{
@@ -35,14 +37,14 @@ userRouter.route('/update-avatar').post(
         maxCount: 1
     }]),
     updateAvatar
-)
+);
 
-userRouter.route('/cart').get(getUserCart)
+userRouter.route('/cart').get(getUserCart);
 
-userRouter.route('/add-cart').post(addToCart)
+userRouter.route('/add-cart').post(addToCart);
 
-userRouter.route('/update-cart-qty').post(updateCartQuantity)
+userRouter.route('/update-cart-qty').post(updateCartQuantity);
 
-userRouter.route('/remove-cart/:productId').delete(removeFromCart)
+userRouter.route('/remove-cart/:productId').delete(removeFromCart);
 
-export { userRouter }
+export { userRouter };

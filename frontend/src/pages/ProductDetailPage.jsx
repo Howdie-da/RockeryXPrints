@@ -108,6 +108,26 @@ export default function ProductDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deletePopupOpen, setDeletePopupOpen] = useState(false);
 
+  const [alertPopup, setAlertPopup] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'OK',
+    singleButton: true,
+    onConfirm: null
+  });
+
+  const triggerAlert = (message, title = 'NOTIFICATION', onConfirm = null, singleButton = true, confirmText = 'OK') => {
+    setAlertPopup({
+      isOpen: true,
+      title,
+      message,
+      confirmText,
+      singleButton,
+      onConfirm
+    });
+  };
+
   const fetchReviews = (productId) => {
     if (!productId) return;
     getProductReviewsAPI(productId)
@@ -247,17 +267,24 @@ export default function ProductDetailPage() {
   };
 
   const handleDeleteReview = (reviewId) => {
-    if (!window.confirm('DELETE THIS REVIEW?')) return;
-    deleteReviewAPI(reviewId)
-      .then(() => {
-        setUserMessage('');
-        setUserRating(5);
-        fetchProductDetails();
-        fetchReviews(product._id);
-      })
-      .catch((err) => {
-        alert(err.response?.data?.message || 'FAILED TO DELETE REVIEW');
-      });
+    triggerAlert(
+      'DELETE THIS REVIEW? THIS ACTION CANNOT BE UNDONE.',
+      'CONFIRM DELETION',
+      () => {
+        deleteReviewAPI(reviewId)
+          .then(() => {
+            setUserMessage('');
+            setUserRating(5);
+            fetchProductDetails();
+            fetchReviews(product._id);
+          })
+          .catch((err) => {
+            triggerAlert(err.response?.data?.message || 'FAILED TO DELETE REVIEW', 'ERROR OCCURRED');
+          });
+      },
+      false,
+      'YES, DELETE'
+    );
   };
 
   // Submit Edit API
@@ -307,7 +334,7 @@ export default function ProductDetailPage() {
       await deleteProductAPI(product._id);
       navigate('/categories');
     } catch (err) {
-      alert(err?.response?.data?.message || 'FAILED TO REMOVE PRODUCT.');
+      triggerAlert(err?.response?.data?.message || 'FAILED TO REMOVE PRODUCT.', 'ERROR OCCURRED');
     }
   };
 
@@ -1100,6 +1127,20 @@ export default function ProductDetailPage() {
         cancelText="CANCEL"
         onConfirm={handleDeleteProduct}
         onCancel={() => setDeletePopupOpen(false)}
+      />
+
+      {/* General Alert/Confirm Popup */}
+      <Popup
+        isOpen={alertPopup.isOpen}
+        title={alertPopup.title}
+        message={alertPopup.message}
+        confirmText={alertPopup.confirmText}
+        singleButton={alertPopup.singleButton}
+        onConfirm={() => {
+          alertPopup.onConfirm?.();
+          setAlertPopup((prev) => ({ ...prev, isOpen: false }));
+        }}
+        onCancel={() => setAlertPopup((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

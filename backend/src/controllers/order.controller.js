@@ -1,231 +1,246 @@
-import { Order } from "../models/order.model.js"
-import { User } from "../models/user.model.js"
-import { Product } from "../models/product.model.js"
-import { asyncHandler } from "../utils/asyncHandler.js"
-import { ApiError } from "../utils/ApiError.js"
-import { ApiResponse } from "../utils/ApiResponse.js"
-import crypto from "crypto"
+import mongoose from "mongoose";
+import { Order } from "../models/order.model.js";
+import { User } from "../models/user.model.js";
+import { Product } from "../models/product.model.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import crypto from "crypto";
 
 const createOrder = asyncHandler(async (req, res) => {
-    const { shippingAddress, paymentMethod } = req.body
+    const { shippingAddress, paymentMethod } = req.body;
 
     if (!shippingAddress || !shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zipCode || !shippingAddress.country || !shippingAddress.phone) {
-        throw new ApiError(400, "Complete shipping address is required")
+        throw new ApiError(400, "Complete shipping address is required");
     }
 
-    const user = await User.findById(req.user._id).populate("cart.product")
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    if (!user.cart || user.cart.length === 0) {
-        throw new ApiError(400, "Your cart is empty")
-    }
+    try {
+        const user = await User.findById(req.user._id).populate("cart.product").session(session);
 
-    let totalMRP = 0
-    let totalSellingPrice = 0
-    const orderItems = []
-
-    for (const item of user.cart) {
-        const product = item.product
-        
-        if (product.stock < item.quantity) {
-            throw new ApiError(400, `Product "${product.name}" does not have enough stock`)
+        if (!user || !user.cart || user.cart.length === 0) {
+            throw new ApiError(400, "Your cart is empty");
         }
 
-        // Deduct inventory stock and increment salesCount
-        product.stock -= item.quantity
-        product.salesCount = (product.salesCount || 0) + item.quantity
-        await product.save({ validateBeforeSave: false })
+        let totalMRP = 0;
+        let totalSellingPrice = 0;
+        const orderItems = [];
 
-        totalMRP += product.mrp * item.quantity
-        totalSellingPrice += product.sellingPrice * item.quantity
+        for (const item of user.cart) {
+            const product = item.product;
 
-        orderItems.push({
-            product: product._id,
-            name: product.name,
-            image: product.images[0],
-            quantity: item.quantity,
-            priceAtPurchase: product.sellingPrice
-        })
+            // Atomic stock deduction check prevents overselling in high-concurrency environments
+            const updatedProduct = await Product.findOneAndUpdate(
+                { _id: product._id, stock: { $gte: item.quantity } },
+                {
+                    $inc: {
+                        stock: -item.quantity,
+                        salesCount: item.quantity
+                    }
+                },
+                { returnDocument: "after", session }
+            );
+
+            if (!updatedProduct) {
+                throw new ApiError(400, `Product "${product.name}" does not have enough stock available.`);
+            }
+
+            totalMRP += updatedProduct.mrp * item.quantity;
+            totalSellingPrice += updatedProduct.sellingPrice * item.quantity;
+
+            orderItems.push({
+                product: updatedProduct._id,
+                name: updatedProduct.name,
+                image: updatedProduct.images?.[0] || "",
+                quantity: item.quantity,
+                priceAtPurchase: updatedProduct.sellingPrice
+            });
+        }
+
+        const shippingFee = paymentMethod === "cod" ? 50 : 0;
+        const tax = Math.round(totalSellingPrice * 0.18);
+        const finalTotal = totalSellingPrice + tax + shippingFee;
+
+        const orderId = `ORD-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+
+        const [order] = await Order.create([{
+            user: req.user._id,
+            orderId,
+            orderItems,
+            totalMRP,
+            totalSellingPrice,
+            tax,
+            shippingFee,
+            finalTotal,
+            shippingAddress,
+            paymentMethod: paymentMethod || "Online",
+            paymentStatus: paymentMethod === "cod" ? "Pending" : "Paid"
+        }], { session });
+
+        user.cart = [];
+        await user.save({ session, validateBeforeSave: false });
+
+        await session.commitTransaction();
+        session.endSession();
+
+        return res
+            .status(201)
+            .json(new ApiResponse(201, order, "Order created successfully."));
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
     }
-    const shippingFee = paymentMethod !== "cod" ? 0 : 50 
-    
-    const tax = Math.round(totalSellingPrice * 0.18) 
-    
-    const finalTotal = totalSellingPrice + tax + shippingFee
-
-    const orderId = `ORD-${Date.now()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`
-
-    const order = await Order.create({
-        user: req.user._id,
-        orderId,
-        orderItems,
-        totalMRP,
-        totalSellingPrice,
-        tax,
-        shippingFee,
-        finalTotal,
-        shippingAddress,
-        paymentMethod: paymentMethod || "Online",
-        paymentStatus: paymentMethod === "cod" ? "Pending" : "Paid"
-    })
-
-    user.cart = []
-    await user.save({ validateBeforeSave: false })
-
-    return res
-    .status(201)
-    .json(new ApiResponse(201, order, "Order created successfully. Ready for payment processing."))
-})
+});
 
 const getOrders = asyncHandler(async (req, res) => {
-    const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 })
+    const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
 
     if (!orders) {
-        throw new ApiError(404, "No orders found")
+        throw new ApiError(404, "No orders found");
     }
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, orders, "Order history fetched successfully"))
-})
+        .status(200)
+        .json(new ApiResponse(200, orders, "Order history fetched successfully"));
+});
 
 const getAllOrders = asyncHandler(async (req, res) => {
     const orders = await Order.find()
         .populate("user", "fullName email")
-        .sort({ createdAt: -1 })
+        .sort({ createdAt: -1 });
 
-    let totalRevenue = 0
+    let totalRevenue = 0;
     orders.forEach(order => {
         if (order.paymentStatus === "Paid") {
-            totalRevenue += order.finalTotal
+            totalRevenue += order.finalTotal;
         }
-    })
+    });
 
     return res
-    .status(200)
-    .json(
-        new ApiResponse(200, {
-            totalOrders: orders.length,
-            totalRevenue,
-            orders
-        }, "All orders fetched successfully")
-    )
-})
+        .status(200)
+        .json(
+            new ApiResponse(200, {
+                totalOrders: orders.length,
+                totalRevenue,
+                orders
+            }, "All orders fetched successfully")
+        );
+});
 
 const updateOrderStatus = asyncHandler(async (req, res) => {
-    const { orderId } = req.params
-    const { status } = req.body
+    const { orderId } = req.params;
+    const { status } = req.body;
 
-    const order = await Order.findById(orderId)
+    const order = await Order.findById(orderId);
 
     if (!order) {
-        throw new ApiError(404, "Order not found")
+        throw new ApiError(404, "Order not found");
     }
 
     if (order.orderStatus === "Delivered") {
-        throw new ApiError(400, "You have already delivered this order")
+        throw new ApiError(400, "You have already delivered this order");
     }
 
-    // Handle inventory restock if order was cancelled
+    // Restock inventory atomically if order is cancelled
     if (status === "Cancelled" && order.orderStatus !== "Cancelled") {
         for (const item of order.orderItems) {
-            const product = await Product.findById(item.product)
-            if (product) {
-                product.stock += item.quantity
-                product.salesCount = Math.max(0, (product.salesCount || 0) - item.quantity)
-                await product.save({ validateBeforeSave: false })
-            }
+            await Product.findByIdAndUpdate(item.product, {
+                $inc: {
+                    stock: item.quantity,
+                    salesCount: -item.quantity
+                }
+            });
         }
     } else if (order.orderStatus === "Cancelled" && status !== "Cancelled") {
-        // Re-deduct inventory if changing status from Cancelled to something else
         for (const item of order.orderItems) {
-            const product = await Product.findById(item.product)
-            if (product) {
-                if (product.stock < item.quantity) {
-                    throw new ApiError(400, `Cannot update order status. Product "${product.name}" does not have enough stock`)
-                }
-                product.stock -= item.quantity
-                product.salesCount = (product.salesCount || 0) + item.quantity
-                await product.save({ validateBeforeSave: false })
+            const updatedProduct = await Product.findOneAndUpdate(
+                { _id: item.product, stock: { $gte: item.quantity } },
+                {
+                    $inc: {
+                        stock: -item.quantity,
+                        salesCount: item.quantity
+                    }
+                },
+                { returnDocument: true }
+            );
+            if (!updatedProduct) {
+                throw new ApiError(400, `Cannot update order status. Product stock insufficient.`);
             }
         }
     }
 
-    order.orderStatus = status
+    order.orderStatus = status;
 
     if (status === "Delivered") {
-        order.deliveredAt = Date.now()
+        order.deliveredAt = Date.now();
         if (order.paymentMethod === "cod") {
-            order.paymentStatus = "Paid"
+            order.paymentStatus = "Paid";
         }
     }
 
-    await order.save({ validateBeforeSave: false })
+    await order.save({ validateBeforeSave: false });
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, order, `Order status updated to ${status}`))
-})
+        .status(200)
+        .json(new ApiResponse(200, order, `Order status updated to ${status}`));
+});
 
 const getOrderById = asyncHandler(async (req, res) => {
-    const { orderId } = req.params
+    const { orderId } = req.params;
 
-    const order = await Order.findById(orderId).populate("user", "fullName email avatar")
+    const order = await Order.findById(orderId).populate("user", "fullName email avatar");
 
     if (!order) {
-        throw new ApiError(404, "Order not found")
+        throw new ApiError(404, "Order not found");
     }
 
     const ownerIdStr = order.user?._id ? order.user._id.toString() : order.user?.toString();
     const reqUserIdStr = req.user?._id ? req.user._id.toString() : '';
 
-    console.log("Order owner:", ownerIdStr);
-    console.log("Request user ID:", reqUserIdStr);
-    console.log("Request user role:", req.user?.role);
-    console.log("Is owner match:", ownerIdStr === reqUserIdStr);
-    console.log("Is admin:", req.user?.role === 'admin');
-
     if (ownerIdStr !== reqUserIdStr && req.user?.role !== 'admin') {
-        throw new ApiError(403, "You are not authorized to view this order")
+        throw new ApiError(403, "You are not authorized to view this order");
     }
 
     return res
         .status(200)
-        .json(new ApiResponse(200, order, "Order details fetched successfully"))
-})
+        .json(new ApiResponse(200, order, "Order details fetched successfully"));
+});
 
 const cancelMyOrder = asyncHandler(async (req, res) => {
-    const { orderId } = req.params
+    const { orderId } = req.params;
 
-    const order = await Order.findById(orderId)
+    const order = await Order.findById(orderId);
 
     if (!order) {
-        throw new ApiError(404, "Order not found")
+        throw new ApiError(404, "Order not found");
     }
 
     if (order.user.toString() !== req.user._id.toString()) {
-        throw new ApiError(403, "You are not authorized to cancel this order")
+        throw new ApiError(403, "You are not authorized to cancel this order");
     }
 
     if (order.orderStatus !== "Processing") {
-        throw new ApiError(400, "Only orders in 'Processing' status can be cancelled")
+        throw new ApiError(400, "Only orders in 'Processing' status can be cancelled");
     }
 
-    // Restock inventory stock and update salesCount
     for (const item of order.orderItems) {
-        const product = await Product.findById(item.product)
-        if (product) {
-            product.stock += item.quantity
-            product.salesCount = Math.max(0, (product.salesCount || 0) - item.quantity)
-            await product.save({ validateBeforeSave: false })
-        }
+        await Product.findByIdAndUpdate(item.product, {
+            $inc: {
+                stock: item.quantity,
+                salesCount: -item.quantity
+            }
+        });
     }
 
-    order.orderStatus = "Cancelled"
-    await order.save({ validateBeforeSave: false })
+    order.orderStatus = "Cancelled";
+    await order.save({ validateBeforeSave: false });
 
     return res
         .status(200)
-        .json(new ApiResponse(200, order, "Order cancelled successfully"))
-})
+        .json(new ApiResponse(200, order, "Order cancelled successfully"));
+});
 
-export { createOrder, getOrders, getAllOrders, updateOrderStatus, getOrderById, cancelMyOrder }
+export { createOrder, getOrders, getAllOrders, updateOrderStatus, getOrderById, cancelMyOrder };
