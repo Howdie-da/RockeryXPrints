@@ -1,5 +1,5 @@
 // src/pages/AuthPage.jsx
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { useDispatch } from 'react-redux';
@@ -10,7 +10,7 @@ import { loginUser, registerUser, getUserCart } from '../services/api';
 
 const spring = { type: 'spring', bounce: 0, duration: 0.3 };
 
-const BrutalInput = ({ label, id, type = 'text', value, onChange, required, placeholder, rightSlot }) => (
+const BrutalInput = ({ label, id, name, type = 'text', value, onChange, required, placeholder, autoComplete, rightSlot }) => (
   <div className="flex flex-col gap-1">
     <label htmlFor={id} className="font-space text-[10px] md:text-xs font-bold uppercase tracking-[0.15em] md:tracking-[0.2em] text-black">
       {label}
@@ -18,12 +18,13 @@ const BrutalInput = ({ label, id, type = 'text', value, onChange, required, plac
     <div className="relative">
       <input
         id={id}
+        name={name || id}
         type={type}
         value={value}
         onChange={onChange}
         required={required}
         placeholder={placeholder}
-        autoComplete="off"
+        autoComplete={autoComplete}
         className="w-full bg-transparent border-b-4 border-black px-0 py-3 font-space text-sm text-black placeholder:text-neutral-400 focus:outline-none pr-10"
         style={{ fontSize: '16px' }} /* prevents iOS zoom on focus */
       />
@@ -35,6 +36,8 @@ const BrutalInput = ({ label, id, type = 'text', value, onChange, required, plac
 );
 
 export default function AuthPage() {
+  const formRef = useRef(null);
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [mode, setMode] = useState('login');
@@ -46,7 +49,7 @@ export default function AuthPage() {
   const set = (field) => (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevents the INITIAL page reload
     setError('');
 
     if (form.password.length < 8) {
@@ -56,25 +59,37 @@ export default function AuthPage() {
 
     setLoading(true);
     try {
-        const queryParams = new URLSearchParams(window.location.search);
-        const redirectPath = queryParams.get('redirect') || '/dashboard';
-        if (mode === 'login') {
-          const res = await loginUser({ email: form.email, password: form.password });
-          const userObj = res.data?.data?.user || res.data?.data;
-          dispatch(setUser({ user: userObj }));
-          // Fetch their cart from database
-          getUserCart()
-            .then((cartRes) => {
-              dispatch(setCart(cartRes.data?.data || []));
-            })
-            .catch(() => {});
+      const queryParams = new URLSearchParams(window.location.search);
+      const redirectPath = queryParams.get('redirect') || '/dashboard';
+      
+      if (mode === 'login') {
+        const res = await loginUser({ email: form.email, password: form.password });
+        const userObj = res.data?.data?.user || res.data?.data;
+        dispatch(setUser({ user: userObj }));
+
+        // Fetch their cart
+        getUserCart()
+          .then((cartRes) => dispatch(setCart(cartRes.data?.data || [])))
+          .catch(() => { });
+
+        // 3. Force native form submission to trigger the browser's password manager
+        if (formRef.current) formRef.current.submit();
+
+        setTimeout(() => {
           navigate(redirectPath);
-        } else {
-          const res = await registerUser({ fullName: form.fullName, email: form.email, password: form.password });
-          const userObj = res.data?.data?.user || res.data?.data;
-          dispatch(setUser({ user: userObj }));
+        }, 250);
+      } else {
+        const res = await registerUser({ fullName: form.fullName, email: form.email, password: form.password });
+        const userObj = res.data?.data?.user || res.data?.data;
+        dispatch(setUser({ user: userObj }));
+
+        // 3. Force native form submission to trigger the browser's password manager
+        if (formRef.current) formRef.current.submit();
+
+        setTimeout(() => {
           navigate(redirectPath);
-        }
+        }, 250);
+      }
     } catch (err) {
       setError(err?.response?.data?.message || 'AUTHENTICATION FAILED. RETRY.');
     } finally {
@@ -84,6 +99,8 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-dvh bg-white flex flex-col items-center justify-center px-4 py-10 selection:bg-black selection:text-white">
+      {/* Hidden iframe for native browser form password detection */}
+      <iframe name="hidden_auth_iframe" id="hidden_auth_iframe" style={{ display: 'none' }} title="hidden_auth_iframe" />
 
       {/* Brand back-link */}
       <Link
@@ -106,9 +123,8 @@ export default function AuthPage() {
             <button
               key={m}
               onClick={() => { setMode(m); setError(''); }}
-              className={`flex-1 font-space font-bold uppercase text-[10px] md:text-xs py-3 tracking-widest transition-colors duration-75 ${
-                mode === m ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
-              }`}
+              className={`flex-1 font-space font-bold uppercase text-[10px] md:text-xs py-3 tracking-widest transition-colors duration-75 ${mode === m ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-100'
+                }`}
             >
               {m === 'login' ? 'LOGIN' : 'REGISTER'}
             </button>
@@ -125,11 +141,20 @@ export default function AuthPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+        <form 
+          ref={formRef}
+          action="#saved" 
+          method="post" 
+          target="hidden_auth_iframe" 
+          onSubmit={handleSubmit} 
+          className="flex flex-col gap-6"
+        >
           {mode === 'register' && (
             <BrutalInput
               label="FULL NAME"
               id="fullName"
+              name="fullName"
+              autoComplete="name"
               value={form.fullName}
               onChange={set('fullName')}
               required
@@ -140,7 +165,9 @@ export default function AuthPage() {
           <BrutalInput
             label="EMAIL ADDRESS"
             id="email"
+            name="email"
             type="email"
+            autoComplete="username"
             value={form.email}
             onChange={set('email')}
             required
@@ -150,7 +177,9 @@ export default function AuthPage() {
           <BrutalInput
             label="PASSWORD"
             id="password"
+            name="password"
             type={showPw ? 'text' : 'password'}
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             value={form.password}
             onChange={set('password')}
             required

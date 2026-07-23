@@ -19,6 +19,7 @@ import CategoriesPage from './pages/CategoriesPage.jsx'
 import CollectionsPage from './pages/CollectionsPage.jsx'
 import ShopPage from './pages/ShopPage.jsx'
 import CategoryDetailPage from './pages/CategoryDetailPage.jsx'
+import AuthLayout from './components/AuthLayout.jsx'
 
 const router = createBrowserRouter([
   {
@@ -27,7 +28,11 @@ const router = createBrowserRouter([
   },
   {
     path: '/auth',
-    element: <AuthPage />,
+    element: (
+      <AuthLayout authentication={false}>
+        <AuthPage />
+      </AuthLayout>
+    ),
   },
   {
     path: '/products/:slug',
@@ -39,11 +44,19 @@ const router = createBrowserRouter([
   },
   {
     path: '/dashboard',
-    element: <DashboardPage />,
+    element: (
+      <AuthLayout authentication={true}>
+        <DashboardPage />
+      </AuthLayout>
+    ),
   },
   {
     path: '/orders/:orderId',
-    element: <OrderDetailPage />,
+    element: (
+      <AuthLayout authentication={true}>
+        <OrderDetailPage />
+      </AuthLayout>
+    ),
   },
   {
     path: '/collections',
