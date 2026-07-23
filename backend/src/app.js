@@ -28,6 +28,11 @@ import { userRouter } from './routes/user.routes.js'
 import { prodRouter } from './routes/product.routes.js'
 import { orderRouter } from './routes/order.routes.js'
 
+// Health Check endpoints (Root-level for Render Dashboard & API-level for Frontend)
+app.get(['/health', '/api/v1/health'], (req, res) => {
+    res.status(200).json({ status: "ok", message: "Server is online", timestamp: new Date().toISOString() });
+});
+
 app.use('/api/v1/users', userRouter)
 app.use('/api/v1/prods', prodRouter)
 app.use('/api/v1/orders', orderRouter)

@@ -10,6 +10,9 @@ const api = axios.create({
     headers: { 'Content-Type': 'application/json' },
 });
 
+// ─── Health check ─────────────────────────────────────────────────────────
+export const checkHealthAPI = (timeoutMs = 120000) => api.get('/health', { timeout: timeoutMs });
+
 // ─── Auth ──────────────────────────────────────────────────────────────────
 export const registerUser = (data) => api.post('/users/register', data);
 export const loginUser = (data) => api.post('/users/login', data);
