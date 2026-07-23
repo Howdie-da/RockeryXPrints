@@ -5,37 +5,37 @@ import axios from 'axios';
 const BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 const api = axios.create({
-  baseURL: BASE_URL,
-  withCredentials: true,
-  headers: { 'Content-Type': 'application/json' },
+    baseURL: BASE_URL,
+    withCredentials: true,
+    headers: { 'Content-Type': 'application/json' },
 });
 
 // ─── Auth ──────────────────────────────────────────────────────────────────
-export const registerUser   = (data) => api.post('/users/register', data);
-export const loginUser      = (data) => api.post('/users/login', data);
-export const logoutUser     = ()     => api.get('/users/logout');
-export const getCurrentUser = ()     => api.get('/users/current-user');
-export const updateDetails  = (data) => api.post('/users/update-details', data);
+export const registerUser = (data) => api.post('/users/register', data);
+export const loginUser = (data) => api.post('/users/login', data);
+export const logoutUser = () => api.get('/users/logout');
+export const getCurrentUser = () => api.get('/users/current-user');
+export const updateDetails = (data) => api.post('/users/update-details', data);
 export const changePassword = (data) => api.post('/users/change-password', data);
 export const updateAvatarAPI = (data) => api.post('/users/update-avatar', data, { headers: { 'Content-Type': 'multipart/form-data' } });
 
 // ─── Cart ──────────────────────────────────────────────────────────────────
-export const getUserCart    = ()     => api.get('/users/cart');
-export const addToCartAPI   = (data) => api.post('/users/add-cart', data);
+export const getUserCart = () => api.get('/users/cart');
+export const addToCartAPI = (data) => api.post('/users/add-cart', data);
 export const updateCartQuantityAPI = (productId, quantity) => api.post('/users/update-cart-qty', { productId, quantity });
 export const removeFromCartAPI = (productId) => api.delete(`/users/remove-cart/${productId}`);
 
 // ─── Products ──────────────────────────────────────────────────────────────
-export const getCategories    = (isAdmin = false) => isAdmin ? api.get('/prods/admin/categories') : api.get('/prods/categories');
-export const getCollections   = (isAdmin = false) => isAdmin ? api.get('/prods/admin/collections') : api.get('/prods/collections');
-export const getProducts      = (params) => api.get('/prods/products', { params });
-export const getProductBySlug = (slug)   => api.get(`/prods/products/${slug}`);
-export const addCategoryAPI   = (data)   => api.post('/prods/add-category', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+export const getCategories = (isAdmin = false) => isAdmin ? api.get('/prods/admin/categories') : api.get('/prods/categories');
+export const getCollections = (isAdmin = false) => isAdmin ? api.get('/prods/admin/collections') : api.get('/prods/collections');
+export const getProducts = (params) => api.get('/prods/products', { params });
+export const getProductBySlug = (slug) => api.get(`/prods/products/${slug}`);
+export const addCategoryAPI = (data) => api.post('/prods/add-category', data, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const deleteCategoryAPI = (categoryId) => api.delete(`/prods/delete-category/${categoryId}`);
-export const addCollectionAPI = (data)   => api.post('/prods/add-collection', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+export const addCollectionAPI = (data) => api.post('/prods/add-collection', data, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const updateCollectionAPI = (collectionId, data) => api.post(`/prods/update-collection/${collectionId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const deleteCollectionAPI = (collectionId) => api.delete(`/prods/delete-collection/${collectionId}`);
-export const addProductAPI    = (data)   => api.post('/prods/add-product', data, { headers: { 'Content-Type': 'multipart/form-data' } });
+export const addProductAPI = (data) => api.post('/prods/add-product', data, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const updateProductAPI = (productId, data) => api.post(`/prods/update-product/${productId}`, data, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const deleteProductAPI = (productId) => api.delete(`/prods/delete-product/${productId}`);
 
@@ -46,7 +46,7 @@ export const deleteReviewAPI = (reviewId) => api.delete(`/prods/reviews/${review
 
 // ─── Orders ────────────────────────────────────────────────────────────────
 export const createOrder = (data) => api.post('/orders/create', data);
-export const getOrders   = ()     => api.get('/orders/get-orders');
+export const getOrders = () => api.get('/orders/get-orders');
 export const getOrderByIdAPI = (orderId) => api.get(`/orders/${orderId}`);
 export const cancelMyOrderAPI = (orderId) => api.patch(`/orders/cancel/${orderId}`);
 export const getAllOrdersAPI = () => api.get('/orders/get-all-orders');

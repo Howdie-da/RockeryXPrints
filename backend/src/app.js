@@ -5,7 +5,17 @@ import cookieParser from 'cookie-parser'
 const app = express()
 
 app.use(cors({
-    origin: process.env.CORS_ORIGIN,
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (process.env.CORS_ORIGIN === '*' || !process.env.CORS_ORIGIN) {
+            return callback(null, true);
+        }
+        const allowedOrigins = process.env.CORS_ORIGIN.split(',').map((o) => o.trim());
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(null, true); // Fallback allow origin for local dev
+    },
     credentials: true
 }))
 
